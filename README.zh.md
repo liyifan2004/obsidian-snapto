@@ -4,7 +4,16 @@
 
 用数字键直接选 Obsidian 搜索弹窗里的结果；停止输入后，完全匹配的结果会自己选中。
 
-SnapTo 不新增搜索框。它作用在 Obsidian 已有的建议列表上：快速切换、命令面板、标签与链接补全，以及其他插件打开的建议弹窗。
+SnapTo 不新增搜索框。它作用在 Obsidian 已有的建议列表上。
+
+以下入口已实测可用：
+
+- 快速切换
+- 命令面板
+- 编辑器里的 `[[` 链接补全
+- 其他插件打开的建议弹窗
+
+标签与属性补全走的是和链接补全同一套代码，但没有实测。全局搜索、笔记内查找、大纲不支持，原因见 [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)。
 
 ## 它做什么
 
@@ -23,7 +32,7 @@ SnapTo 不新增搜索框。它作用在 Obsidian 已有的建议列表上：快
 - 不支持笔记内查找（`Ctrl+F`）。它高亮的是正文文字，不是结果列表。
 - 不支持原生大纲搜索。Obsidian 的大纲是个视图，不是搜索框。
 
-各入口的实际情况与验证方式见 [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)。
+各入口、各环境的实际情况与验证方式见 [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)。
 
 ## 安装
 
@@ -33,7 +42,7 @@ SnapTo 不新增搜索框。它作用在 Obsidian 已有的建议列表上：快
 2. 放进 `<vault>/.obsidian/plugins/snapto/`。
 3. 在 设置 → 第三方插件 里启用 **SnapTo**。
 
-需要 Obsidian 1.5.0 及以上。桌面端是实测目标；代码没有用 Node.js API，设置页在移动端也可用，但触摸操作尚未验证。
+需要 Obsidian 1.5.0 及以上，仅桌面端。核心操作是「修饰键 + 数字」，触摸设备上没有对应操作，因此不提供移动端。弹出窗口（popout）可用。
 
 ## 设置
 

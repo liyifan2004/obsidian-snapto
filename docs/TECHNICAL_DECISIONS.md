@@ -166,7 +166,7 @@ A switch that cannot change behaviour is worse than no switch: it teaches users 
 
 ## 0008. Rejected: supporting the global search panel in v1
 
-**Date:** 2026-11-13 · **Status:** accepted
+**Date:** 2026-11-13 · **Status:** refined by 0012
 
 ### Context
 
@@ -183,3 +183,98 @@ Supporting it means inventing a highlight layer and deciding whether choosing a 
 ### Consequences
 
 - Revisit when the selection model exists, or build a deliberate navigation mode with its own settings.
+
+---
+
+## 0009. One context per host instance
+
+**Date:** 2026-11-13 · **Status:** accepted
+
+### Context
+
+`PopoverSuggest.open()` runs on every keystroke. It returns early when the popover is already open, but our wrapper runs regardless, and contexts were keyed by a serial id that could never match an existing one.
+
+Measured consequence: typing four characters produced four contexts, 36 keymap handlers, four observers and four concurrent auto-match timers. With auto confirm enabled, that is four chances to submit the same choice.
+
+### Decision
+
+Carry the host instance on the context and look it up before attaching. Repeat opens reuse the existing context: touch it, re-sync shortcuts, refresh badges.
+
+### Rationale
+
+The alternative — a `WeakMap` keyed by host — would work equally well, but the context already has to know which instance it came from, and putting the reference on it keeps the lookup logic in one place with the data.
+
+### Consequences
+
+- Depends on reference equality. A host that constructs a new instance per open would still produce one context per open; that is correct behaviour, not a bug, so the dedupe silently does nothing rather than misfiring.
+- `SurfaceBinder` exists so the rule can be tested without instantiating a `Plugin`.
+
+---
+
+## 0010. Desktop only
+
+**Date:** 2026-11-13 · **Status:** accepted
+
+### Context
+
+`isDesktopOnly` was `false`, which is a promise that the plugin is usable on touch. The distinctive feature is "hold a modifier, press a digit". There is no modifier on a phone and no keyboard.
+
+### Decision
+
+`isDesktopOnly: true`.
+
+### Rationale
+
+Badges alone are not a feature; keeping the plugin mobile-installable would offer phone users a plugin whose main path cannot be reached, and would invite review questions about touch target sizes for UI that only exists to support keyboard use.
+
+### Consequences
+
+- Mobile is out of scope rather than "untested". Nothing in the code is desktop-specific, so this could be revisited if a touch gesture were designed.
+
+---
+
+## 0011. Highlighting carries no extra gate
+
+**Date:** 2026-11-13 · **Status:** accepted
+
+### Context
+
+Decision 0006 set the default minimum match level to `contains` so Chinese titles can be reached. A later proposal was to require a stronger level before moving the highlight, on the grounds that loose matching is noisy.
+
+### Decision
+
+No. The configured minimum applies to highlighting as-is; the strict gate stays in the confirm path only (decision 0004).
+
+### Rationale
+
+Two independent gates on the same action make the setting meaningless: a user who lowers the level would see nothing change. Highlighting is reversible and visible, and the tie policy (`unique` by default) already prevents the worst noise — moving between equally good candidates. Adding a second gate would also break the Chinese case that motivated 0006: `纪要` against `会议纪要 2026` is a `contains` hit, and gating highlighting on `prefix` would hide exactly the improvement.
+
+### Consequences
+
+- Typing a single Latin letter highlights broadly. Mitigated by `unique` doing nothing on ties, and by the confirmation gate.
+- Users who want less movement raise the level themselves.
+
+---
+
+## 0012. Global search panel: 0.2 candidate, not v1
+
+**Date:** 2026-11-13 · **Status:** accepted, refines 0008
+
+### Context
+
+0008 rejected the search panel for v1. Reviewing the 0.2 scope, it is worth stating what would have to be true before it becomes worth doing.
+
+### Decision
+
+Keep it out of 0.1.x. Treat it as the first candidate for 0.2 only if a *navigation* mode is acceptable — not a selection mode.
+
+### Rationale
+
+- The panel has no selection model, so "select the Nth result" has no native meaning. Any implementation invents one, which means owning highlight rendering, scrolling and escape behaviour.
+- "Confirm" there means opening a file, which is a side effect. Do 0004's confidence gate and the tie policy still make sense? They would have to be re-derived, not copied.
+- Estimate: roughly half the work already in 0.1.x, with a worse compatibility story (`.search-result` markup is not a documented contract the way `.suggestion-item` is).
+
+### Consequences
+
+- 0.2 starts with a design note, not an adapter. If the design says "selection", the answer is no and the reason is written down here.
+- Until then, the README says what works instead of implying completeness.

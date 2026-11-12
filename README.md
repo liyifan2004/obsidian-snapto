@@ -4,7 +4,16 @@ English | [简体中文](README.zh.md)
 
 Pick results in Obsidian's search popups by number, and let an exact match select itself once you stop typing.
 
-SnapTo does not add a search box of its own. It works on the suggestion lists Obsidian already shows: the quick switcher, the command palette, tag and link popups, and suggestion dialogs opened by other plugins.
+SnapTo does not add a search box of its own. It works on suggestion lists Obsidian already shows.
+
+Working today, verified in the app:
+
+- the quick switcher
+- the command palette
+- `[[` link completion in the editor
+- suggestion dialogs opened by other plugins
+
+Tag and property popups use the same code path as link completion but have not been exercised. Global search, in-note find and the outline are not supported; the reasons are in [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
 
 ## What it does
 
@@ -23,7 +32,7 @@ SnapTo does not add a search box of its own. It works on the suggestion lists Ob
 - No in-note find (`Ctrl+F`). It highlights text inside the document, it is not a result list.
 - No native outline search. Obsidian's outline is a view, not a search box.
 
-The full list of surfaces, what works, and how it was verified is in [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
+The full list of surfaces, environments and how each was verified is in [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
 
 ## Install
 
@@ -33,7 +42,7 @@ Until the plugin is in the community directory:
 2. Put them in `<vault>/.obsidian/plugins/snapto/`.
 3. Enable **SnapTo** in Settings → Community plugins.
 
-Requires Obsidian 1.5.0 or newer. Desktop is the tested target; the code avoids Node.js APIs and the settings page is usable on mobile, but touch behaviour has not been verified.
+Requires Obsidian 1.5.0 or newer, desktop only. The feature is a modifier plus a digit; there is no touch equivalent, so the plugin is not offered on mobile. Popout windows work.
 
 ## Settings
 

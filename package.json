@@ -1,6 +1,6 @@
 {
   "name": "obsidian-snapto",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Exact-match auto navigation and keyboard-driven result selection for Obsidian search.",
   "main": "main.js",
   "type": "module",

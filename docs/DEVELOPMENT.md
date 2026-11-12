@@ -28,12 +28,16 @@ npm run sync "<vault path>"
 | `SuggestionContext.test.ts` | Row/value alignment, group headers, commit paths, liveness |
 | `SuggestionAttacher.test.ts` | Scene detection, including `{match,item}` and `{type,file}` wrappers |
 | `AutoMatchManager.test.ts` | Highlight vs confirm, the confidence gate, tie policies |
+| `SurfaceBinder.test.ts` | One context per host, reuse, closed-surface replacement, disabled scene |
+| `ModifierTracker.test.ts` | One listener per document, body class on keydown/keyup, multi-window cleanup |
 | `ShortcutManager.test.ts` | Registration per number, index mapping, fall-through, re-registration |
 | `HostPatcher.test.ts` | Notification, prototype restore, no stacking, failing handler isolation |
 | `SearchContextManager.test.ts` | Active selection, pruning, listeners |
 | `Debounce.test.ts` | Stale generations dropped |
 
-What is **not** covered by unit tests: real keymap dispatch, real DOM rendering, the settings page, mobile touch.
+What is **not** covered by unit tests: real keymap dispatch, real DOM rendering, the settings page, popout windows, mobile touch (mobile is out of scope).
+
+Two of the bugs fixed in 0.1.1 were invisible to unit tests and to a single manual click: duplicate contexts per keystroke, and a click fallback that only misbehaved when a list had group headers. Both now have a regression test plus a runtime assertion.
 
 ## Verifying against a real Obsidian
 

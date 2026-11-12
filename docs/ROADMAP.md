@@ -1,5 +1,12 @@
 # Roadmap
 
+## Done (0.1.1)
+
+- One context per host instance; unloading no longer removes a wrapper installed after ours.
+- Popout windows: badges, shortcuts and auto match all work there.
+- Scene toggles apply to already-open surfaces.
+- Click fallback aligned with the read path.
+
 ## Done (0.1.0)
 
 - Quick select on the host's keymap scope: quick switcher, command palette, editor suggests, plugin modals.
@@ -12,7 +19,7 @@
 ## Next
 
 1. **Popover suggests in the wild.** `AbstractInputSuggest` and friends are wired, but no third-party surface was exercised. Pick two popular plugins that use them and re-run the runtime check.
-2. **Light theme and popout windows.** Only the dark theme in the main window has been looked at. Contrast and badge placement need a pass in both, plus one popout window.
+2. **Light theme.** Only the dark theme has been looked at. Badges use theme variables only, but contrast has not been measured.
 3. **`Plugin.onExternalSettingsChange`.** Settings edited on another device are not picked up until reload.
 4. **Command alternatives for users who prefer Obsidian hotkeys.** Nine `select-result-N` commands exist; document a worked example of binding `Alt+1..9`.
 5. **Keyboard navigation of the badge state.** Today arrow keys suppress auto match for 1.2 s. A shorter, configurable value would suit fast typists.

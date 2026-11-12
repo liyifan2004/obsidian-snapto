@@ -6,12 +6,13 @@ What SnapTo touches, which Obsidian versions were checked, and what happens when
 
 Two shipped bundles were unpacked and read (`resources/obsidian.asar` → `app.js`):
 
-| Install | Bundle reports | Read on |
+| Install | Bundle reports | Use |
 | --- | --- | --- |
-| `C:\Users\…\AppData\Local\Obsidian` (stale copy) | 1.5.12 | 2026-11-13 |
-| `D:\Obsidian` (the copy actually running) | 1.13.4 | 2026-11-13 |
+| `C:\Users\…\AppData\Local\Obsidian` (stale copy) | 1.5.12 | bundle read only |
+| `D:\Obsidian` (the copy actually running) | 1.13.4 | bundle read only |
+| `D:\Obsidian`, after the in-app update | 1.15.1 | runtime baseline |
 
-Runtime behaviour was exercised against **Obsidian 1.15.1** (`D:\Obsidian`, auto-updated during the session) in an isolated vault with `--remote-debugging-port`, driving the real keymap and the real suggestion lists.
+Bundle reading covers 1.5.12 and 1.13.4. Everything described as verified at runtime was exercised on **1.15.1** in an isolated vault (`--remote-debugging-port`, separate `--user-data-dir`), driving the real keymap and the real suggestion lists.
 
 Symbol names in the bundle are minified, so class identity was resolved through the export table (`SuggestModal:()=>ww`, `PopoverSuggest:()=>wR`, …) before reading the implementation.
 
@@ -47,7 +48,7 @@ These are **not** in `obsidian.d.ts`. They are read through `readProp()` in `src
 | `Suggestions` | `suggestions` | Row elements | ✔ | ✔ | ✔ |
 | `Suggestions` | `selectedItem` | Highlight index | ✔ | ✔ | ✔ |
 | `Suggestions` | `containerEl` | Scroll container | ✔ | ✔ | ✔ |
-| `Suggestions` | `setSelectedItem(i, evt)` | Move highlight | ✔ | ✔ | ✔ |
+| `Suggestions` | `setSelectedItem(i, evt)` | Move highlight (wraps out-of-range indices) | ✔ | ✔ | ✔ |
 | `Suggestions` | `useSelectedItem(evt)` | Confirm | ✔ | ✔ | ✔ |
 | `PopoverSuggest` | `suggestions`, `suggestEl`, `textInputEl`, `scope` | Popover list | ✔ | ✔ | ✔ |
 | `EditorSuggest` | `context` | Distinguishes editor suggests from input popovers | ✔ | ✔ | ✔ |
@@ -75,10 +76,18 @@ None of them broke the plugin; they are recorded so a future adapter change does
 
 SnapTo does **not** style `.suggestion-item` or any other core class. Badges are elements we create and remove.
 
+## Two behaviours worth knowing
+
+**`setSelectedItem` wraps.** `setSelectedItem(-1)` jumps to the last row and `setSelectedItem(length)` jumps to the first. Nothing in SnapTo relies on this, but it explains why an off-by-one never throws — it silently lands somewhere plausible. Tests assert the exact index for that reason.
+
+**`instanceOf` is per realm.** Obsidian adds `HTMLElement.prototype.instanceOf`, which compares against the constructor of the current window. A node from a popout window fails it. SnapTo therefore matches elements by shape (`nodeType === 1` plus `querySelectorAll`) in `isElementLike`, and only calls `instanceOf` on values that are already known to come from the right document.
+
 ## Failure modes
 
 | Situation | Behaviour |
 | --- | --- |
+| Popout window | Works. Elements are matched by shape, and the modifier tracker keeps one listener per document. Verified at runtime: badges visible, `Ctrl+2` opened the expected note in a second window. |
+| Same host opens repeatedly | One context. `PopoverSuggest.open()` fires on every keystroke; the binder keys contexts by host instance. |
 | `chooser` missing (renamed) | `attachSuggestModal` returns `null`; that surface gets no features. |
 | `scope` missing | Shortcuts are skipped for that surface; auto match still runs. |
 | `values` not an array | Treated as empty; context reports dead and is pruned. |
@@ -88,6 +97,8 @@ SnapTo does **not** style `.suggestion-item` or any other core class. Badges are
 
 ## Version policy
 
-`minAppVersion` is `1.5.0`. Everything SnapTo calls exists there; the internal fields above were confirmed on 1.5.12 as well as 1.13.4.
+`minAppVersion` is `1.5.0`, `isDesktopOnly` is `true`. Everything SnapTo calls exists in 1.5.0; the internal fields above were confirmed by reading 1.5.12 and 1.13.4 and by running 1.15.1.
+
+Desktop only is a product decision, not a technical limit: the feature is a modifier plus a digit, which has no mobile equivalent. See decision 0010.
 
 If a future Obsidian release changes the internal shape, the affected surface degrades to "no SnapTo features", never to "broken search". The check list for re-verification is in [DEVELOPMENT.md](DEVELOPMENT.md).
