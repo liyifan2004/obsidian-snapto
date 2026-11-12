@@ -96,8 +96,24 @@ const wiring = await ev(
 );
 record("plugin loaded and prototypes wrapped", Boolean(wiring?.patched), wiring);
 
-await ev(`(() => { app.commands.executeCommandById("switcher:open"); return true; })()`);
-await sleep(350);
+/** Execute the command and wait for the prompt to exist; tolerate a slow start. */
+async function openSwitcher() {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await ev(`(() => { app.commands.executeCommandById("switcher:open"); return true; })()`);
+    await sleep(400);
+    if (await ev(`!!document.querySelector(".prompt-input")`)) return true;
+  }
+  return false;
+}
+
+if (!(await openSwitcher())) {
+  record("quick switcher opened", false, "no .prompt-input after 4 attempts");
+  client.close();
+  console.log(JSON.stringify({ checks, failed: checks.length }, null, 2));
+  process.exit(1);
+}
+record("quick switcher opened", true, "prompt rendered");
+
 await ev(
   `(() => {
      const input = document.querySelector(".prompt-input");
@@ -125,6 +141,28 @@ record("scene detected", list.scene !== null, list.scene);
 record("badges rendered", list.badges > 0, `${list.badges} badges for ${list.rows} rows`);
 record("shortcuts registered", list.shortcuts === 1, list.shortcuts);
 
+// Re-type three times. A surface that re-registers per keystroke shows up here
+// as a growing context or shortcut count — this is how the 0.1.0 dedupe bug
+// went unnoticed.
+const afterRetouch = await ev(
+  `(async () => {
+     const input = document.querySelector(".prompt-input");
+     for (let i = 0; i < 3; i += 1) {
+       input.value = ${JSON.stringify(QUERY)};
+       input.dispatchEvent(new Event("input", { bubbles: true }));
+       await new Promise((resolve) => setTimeout(resolve, 60));
+     }
+     await new Promise((resolve) => setTimeout(resolve, 250));
+     const p = app.plugins.plugins["snapto"];
+     return { contexts: p.contexts.size(), shortcuts: p.shortcuts.count() };
+   })()`,
+);
+record(
+  "one context after repeated input",
+  afterRetouch.contexts === 1 && afterRetouch.shortcuts === 1,
+  afterRetouch,
+);
+
 if (EXPECT) {
   const target = list.candidates.indexOf(EXPECT);
   if (target < 0) {
@@ -141,6 +179,25 @@ if (EXPECT) {
     );
     record("shortcut opened the expected note", opened.active === EXPECT, opened);
   }
+}
+
+// Typing the full title must leave that row selected once the idle delay passed.
+if (EXPECT) {
+  const autoMatch = await ev(
+    `(async () => {
+       const p = app.plugins.plugins["snapto"];
+       // The shortcut check above closed the switcher; open a fresh one.
+       app.commands.executeCommandById("switcher:open");
+       await new Promise((resolve) => setTimeout(resolve, 350));
+       const input = document.querySelector(".prompt-input");
+       input.value = ${JSON.stringify(EXPECT)};
+       input.dispatchEvent(new Event("input", { bubbles: true }));
+       await new Promise((resolve) => setTimeout(resolve, p.settings.delayMs + 300));
+       const selected = document.querySelector(".suggestion-item.is-selected .suggestion-title");
+       return { selected: selected ? selected.textContent.trim() : null };
+     })()`,
+  );
+  record("auto match selected the typed title", autoMatch.selected === EXPECT, autoMatch);
 }
 
 const settings = await ev(
