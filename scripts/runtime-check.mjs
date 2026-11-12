@@ -141,9 +141,9 @@ record("scene detected", list.scene !== null, list.scene);
 record("badges rendered", list.badges > 0, `${list.badges} badges for ${list.rows} rows`);
 record("shortcuts registered", list.shortcuts === 1, list.shortcuts);
 
-// Re-type three times. A surface that re-registers per keystroke shows up here
-// as a growing context or shortcut count — this is how the 0.1.0 dedupe bug
-// went unnoticed.
+// Re-type three times in the quick switcher. It is a SuggestModal, so this
+// proves the list rebuild does not spawn contexts; the per-keystroke reopen bug
+// lives in PopoverSuggest and is covered by the properties-panel check below.
 const afterRetouch = await ev(
   `(async () => {
      const input = document.querySelector(".prompt-input");
@@ -158,7 +158,7 @@ const afterRetouch = await ev(
    })()`,
 );
 record(
-  "one context after repeated input",
+  "quick switcher keeps one context across retypes",
   afterRetouch.contexts === 1 && afterRetouch.shortcuts === 1,
   afterRetouch,
 );
@@ -198,6 +198,131 @@ if (EXPECT) {
      })()`,
   );
   record("auto match selected the typed title", autoMatch.selected === EXPECT, autoMatch);
+}
+
+// --- A real AbstractInputSuggest: the property-name field opens a PopoverSuggest
+// that calls open() on every keystroke. This is the path that produced one
+// context per character in 0.1.0, and the only runtime check that can catch it.
+// Close the switcher the way a user would; removing the node would leave the
+// modal's keymap scope on the stack.
+await ev(
+  `(() => {
+     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+     return true;
+   })()`,
+);
+await sleep(400);
+
+const popoverReady = await ev(
+  `(async () => {
+     if (!document.querySelector(".metadata-add-button")) {
+       const file = app.vault.getAbstractFileByPath("Daily Note.md");
+       if (!file) return { error: "note missing" };
+       const leaf = app.workspace.getLeaf(false);
+       await leaf.openFile(file);
+       await new Promise((resolve) => setTimeout(resolve, 600));
+       await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: "source" } });
+       await new Promise((resolve) => setTimeout(resolve, 500));
+     }
+     const addButton = document.querySelector(".metadata-add-button .text-icon-button, .metadata-add-button");
+     if (!addButton) return { error: "no add-property button" };
+     addButton.click();
+     await new Promise((resolve) => setTimeout(resolve, 400));
+     const input = document.querySelector(".metadata-property-key-input");
+     if (!input) return { error: "no property key input" };
+     input.focus();
+     return { ok: true, inputClass: input.className, focused: document.activeElement === input };
+   })()`,
+);
+record("popover surface available", Boolean(popoverReady.ok), popoverReady);
+
+if (popoverReady.ok) {
+  // Three separate insertions that all keep matching the built-in "aliases"
+  // property; a sequence with no matches would empty the list and detach the
+  // suggestion container mid-check.
+  await client.send("Page.bringToFront", {});
+
+  // Synthesized keystrokes through CDP are dropped once another window has had
+  // focus, so the value is set and an `input` event dispatched instead. That is
+  // the same event the field fires per character, which is what drives
+  // `AbstractInputSuggest.onInputChange -> showSuggestions -> open()`.
+  const typed = [];
+  for (const text of ["a", "l", "i"]) {
+    const step = await ev(
+      `(() => {
+         const input = document.querySelector(".metadata-property-key-input");
+         if (!input) return { ok: false, reason: "input gone" };
+         input.focus();
+         input.value += ${JSON.stringify(text)};
+         input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+         return { ok: true, value: input.value };
+       })()`,
+    );
+    await sleep(350);
+    typed.push({
+      text,
+      ...step,
+      container: await ev(`!!document.querySelector(".suggestion-container")`),
+    });
+  }
+
+  const popover = await ev(
+    `(() => {
+       const p = app.plugins.plugins["snapto"];
+       const context = p.contexts.active();
+       const container = document.querySelector(".suggestion-container");
+       return {
+         hasContainer: !!container,
+         scene: context ? context.scene : null,
+         contexts: p.contexts.size(),
+         shortcuts: p.shortcuts.count(),
+         watchers: p.autoMatch.count(),
+         badges: document.querySelectorAll(".snapto-index").length,
+         candidates: context ? context.getCandidates().map((c) => c.text).slice(0, 4) : [],
+       };
+     })()`,
+  );
+
+  record("popover scene detected", popover.scene === "popover-suggest", {
+    ...popover,
+    typed,
+  });
+  record(
+    "one context after three keystrokes",
+    popover.contexts === 1 && popover.shortcuts === 1 && popover.watchers === 1,
+    popover,
+  );
+  record("popover badges rendered", popover.badges > 0, `${popover.badges} badges`);
+
+  // Ctrl+2 must pick the second suggestion, creating that property row.
+  if (popover.candidates.length >= 2) {
+    const picked = await ev(
+      `(async () => {
+         const p = app.plugins.plugins["snapto"];
+         const expected = p.contexts.active()?.getCandidates()[1]?.text ?? null;
+         const evt = new KeyboardEvent("keydown", {
+           key: "2", code: "Digit2", ctrlKey: true, bubbles: true, cancelable: true,
+         });
+         window.dispatchEvent(evt);
+         await new Promise((resolve) => setTimeout(resolve, 500));
+         const rows = Array.from(document.querySelectorAll(".metadata-property")).map((row) =>
+           (row.querySelector(".metadata-property-key-input")?.value ?? "").trim(),
+         );
+         return { expected, rows, prevented: evt.defaultPrevented };
+       })()`,
+    );
+    record(
+      "Ctrl+2 picked the second suggestion",
+      picked.rows.includes(picked.expected),
+      picked,
+    );
+  }
+
+  await ev(`(() => {
+    const input = document.querySelector(".metadata-property-key-input");
+    if (input) input.blur();
+    return true;
+  })()`);
 }
 
 const settings = await ev(
