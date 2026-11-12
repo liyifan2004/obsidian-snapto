@@ -21,3 +21,12 @@ data.json
 coverage
 .vitest
 *.tsbuildinfo
+
+# Internal advisory / agent working documents. Never publish these.
+# The real defence is that they live outside the repository
+# (D:/MyProjects/_internal/<project>/); these rules only catch a mistake.
+docs/TASKS-*.md
+docs/REVIEW-*.md
+docs/*-INTERNAL.md
+internal/
+*.local.md
