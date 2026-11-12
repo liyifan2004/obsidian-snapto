@@ -1,5 +1,5 @@
 import type { SceneId } from "../../types";
-import { readArray, readProp, readString } from "../../utils/dom";
+import { isElementLike, readArray, readProp, readString } from "../../utils/dom";
 import { SuggestionContext, type SuggestionListLike } from "../SuggestionContext";
 
 let contextSerial = 0;
@@ -69,7 +69,7 @@ function isEditorSuggest(host: unknown): boolean {
 export function attachSuggestModal(modal: unknown): SuggestionContext | null {
   const list = readProp(modal, "chooser") as SuggestionListLike | undefined;
   const container = readProp(modal, "resultContainerEl");
-  if (!list || !(container instanceof HTMLElement)) return null;
+  if (!list || !isElementLike(container)) return null;
 
   const values = readArray(list, "values") ?? [];
   const scene = detectModalScene(values);
@@ -116,5 +116,5 @@ export function attachPopoverSuggest(host: unknown): SuggestionContext | null {
 }
 
 function asElement(value: unknown): HTMLElement | null {
-  return value instanceof HTMLElement ? value : null;
+  return isElementLike(value) ? value : null;
 }

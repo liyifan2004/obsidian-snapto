@@ -33,11 +33,13 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
     isSceneEnabled: (scene) => this.settings.scenes[scene]?.enabled === true,
     prune: () => this.pruneDead(),
     onAttach: (context) => {
+      this.tracker?.attachDocument(context.containerEl.ownerDocument);
       this.syncContext(context);
       this.autoMatch?.watch(context);
       this.refreshBadges(context);
     },
     onReuse: (context) => {
+      this.tracker?.attachDocument(context.containerEl.ownerDocument);
       this.syncContext(context);
       this.refreshBadges(context);
     },

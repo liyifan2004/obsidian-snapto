@@ -16,8 +16,17 @@ export function readArray(source: unknown, key: string): unknown[] | null {
   return Array.isArray(value) ? value : null;
 }
 
-export function isElement(value: unknown): value is HTMLElement {
-  return value instanceof HTMLElement;
+/**
+ * Element check that survives popout windows.
+ *
+ * `instanceof HTMLElement` compares against the constructor of the *current*
+ * realm, so every node from a popout window fails it. Duck typing on `nodeType`
+ * and `querySelectorAll` has no realm to get wrong.
+ */
+export function isElementLike(value: unknown): value is HTMLElement {
+  if (value === null || typeof value !== "object") return false;
+  const node = value as { nodeType?: unknown; querySelectorAll?: unknown };
+  return node.nodeType === 1 && typeof node.querySelectorAll === "function";
 }
 
 /**
@@ -51,12 +60,4 @@ export function readInputValue(el: HTMLElement | null): string {
   if (!el) return "";
   if (el.instanceOf(HTMLInputElement) || el.instanceOf(HTMLTextAreaElement)) return el.value;
   return el.textContent ?? "";
-}
-
-/** Whether the event target accepts typed text, so native keys must not be stolen. */
-export function isTextEntryTarget(target: unknown): boolean {
-  if (!isElement(target)) return false;
-  if (target.instanceOf(HTMLInputElement)) return true;
-  if (target.instanceOf(HTMLTextAreaElement)) return true;
-  return target.isContentEditable;
 }

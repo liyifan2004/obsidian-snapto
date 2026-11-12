@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { detectModalScene } from "../src/core/adapters/SuggestionAttacher";
+import { isElementLike } from "../src/utils/dom";
 
 describe("detectModalScene", () => {
   it("recognises a command", () => {
@@ -53,5 +54,26 @@ describe("detectModalScene", () => {
   it("recognises wrapped commands too", () => {
     const values = [{ match: {}, item: { id: "app:go-back", name: "Back", callback: () => {} } }];
     expect(detectModalScene(values)).toBe("command-palette");
+  });
+});
+
+describe("isElementLike", () => {
+  it("accepts a real element", () => {
+    expect(isElementLike(createEl("div"))).toBe(true);
+  });
+
+  it("accepts an element from another realm", () => {
+    // A popout node is still an object with nodeType 1, but fails instanceof.
+    const foreign = { nodeType: 1, querySelectorAll: () => [] };
+    expect(isElementLike(foreign)).toBe(true);
+  });
+
+  it("rejects everything else", () => {
+    expect(isElementLike(null)).toBe(false);
+    expect(isElementLike(undefined)).toBe(false);
+    expect(isElementLike({})).toBe(false);
+    expect(isElementLike({ nodeType: 3 })).toBe(false);
+    expect(isElementLike("iframe")).toBe(false);
+    expect(isElementLike(42)).toBe(false);
   });
 });
