@@ -281,6 +281,41 @@ describe("plugin orchestration", () => {
     expect(disabled.committed).toHaveLength(0);
   });
 
+  it("skips a surface with no results when choosing where a command goes", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+
+    const ready = makeHost(["Alpha"]);
+    ready.modal.open();
+
+    // A surface that is open but showing "no results" cannot answer anything.
+    const empty = makeHost([]);
+    empty.modal.open();
+    expect(internals.contexts.size()).toBe(2);
+
+    expect(command(internals, "select-result-1").checkCallback?.(true)).toBe(true);
+    command(internals, "select-result-1").checkCallback?.(false);
+
+    expect(ready.committed).toHaveLength(1);
+    expect(empty.committed).toHaveLength(0);
+  });
+
+  it("prunes dead surfaces before reconciling on a settings change", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+
+    const closed = makeHost(["Alpha"]);
+    closed.modal.open();
+    closed.container.remove();
+
+    internals.onSettingsChanged();
+
+    // Reconciling a context whose container is gone would register handlers on
+    // a keymap scope that has already been popped.
+    expect(internals.contexts.size()).toBe(0);
+    expect(internals.shortcuts.count()).toBe(0);
+  });
+
   it("reapplies the modifier after settings change elsewhere", async () => {
     const { plugin, internals } = await boot();
     active = plugin;

@@ -57,7 +57,7 @@ describe("ShortcutManager", () => {
     (context as unknown as { scope: unknown }).scope = scope;
 
     const manager = new ShortcutManager();
-    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
 
     expect(scope.handlers).toHaveLength(9);
     expect(scope.handlers.map((handler) => handler.key)).toEqual([
@@ -80,7 +80,7 @@ describe("ShortcutManager", () => {
     (context as unknown as { scope: unknown }).scope = scope;
 
     const manager = new ShortcutManager();
-    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
 
     scope.handlers[2]?.run(keyEvent());
     expect(commit).toHaveBeenCalledWith(3);
@@ -92,7 +92,7 @@ describe("ShortcutManager", () => {
     (context as unknown as { scope: unknown }).scope = scope;
 
     const manager = new ShortcutManager();
-    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
 
     const result = scope.handlers[5]?.run(keyEvent());
     expect(result).toBeUndefined();
@@ -105,7 +105,7 @@ describe("ShortcutManager", () => {
     (context as unknown as { scope: unknown }).scope = scope;
 
     const manager = new ShortcutManager();
-    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
 
     scope.handlers[0]?.run({ isComposing: true } as KeyboardEvent);
     expect(commit).not.toHaveBeenCalled();
@@ -117,7 +117,7 @@ describe("ShortcutManager", () => {
     (context as unknown as { scope: unknown }).scope = scope;
 
     const manager = new ShortcutManager();
-    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
 
     scope.handlers[0]?.run(keyEvent());
     expect(commit).not.toHaveBeenCalled();
@@ -129,7 +129,7 @@ describe("ShortcutManager", () => {
     (context as unknown as { scope: unknown }).scope = scope;
 
     const manager = new ShortcutManager();
-    manager.sync(context, { enabled: false, modifier: "Mod", maxIndex: 9 });
+    manager.sync(context, { enabled: false, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
 
     expect(scope.handlers).toHaveLength(0);
     expect(manager.count()).toBe(0);
@@ -141,8 +141,8 @@ describe("ShortcutManager", () => {
     (context as unknown as { scope: unknown }).scope = scope;
 
     const manager = new ShortcutManager();
-    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
-    manager.sync(context, { enabled: true, modifier: "Alt", maxIndex: 9 });
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
+    manager.sync(context, { enabled: true, modifier: "Alt", maxIndex: 9, scene: "quick-switcher" });
 
     expect(scope.handlers).toHaveLength(9);
     expect(scope.handlers[0]?.modifiers).toEqual(["Alt"]);
@@ -154,7 +154,7 @@ describe("ShortcutManager", () => {
     const manager = new ShortcutManager();
 
     expect(() =>
-      manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 }),
+      manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" }),
     ).not.toThrow();
     expect(manager.count()).toBe(0);
   });
@@ -165,7 +165,7 @@ describe("ShortcutManager", () => {
     (context as unknown as { scope: unknown }).scope = scope;
 
     const manager = new ShortcutManager();
-    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
     manager.clear();
 
     expect(scope.handlers).toHaveLength(0);

@@ -95,6 +95,10 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   }
 
   onSettingsChanged(): void {
+    // Reconcile must not resurrect a surface whose container is already gone:
+    // its keymap scope is popped, so registering handlers on it is wasted work
+    // that also inflates the counts used by tests and the runtime check.
+    this.pruneDead();
     this.tracker?.setModifier(this.settings.modifier);
     for (const context of this.contexts.all()) this.reconcile(context);
   }
@@ -167,6 +171,7 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
       enabled: this.settings.quickSelectEnabled && this.isSceneEnabled(context),
       modifier: this.settings.modifier,
       maxIndex: MAX_SHORTCUTS,
+      scene: context.scene,
     });
   }
 
@@ -192,6 +197,9 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
       const context = ordered[i];
       if (!context || !context.isAlive()) continue;
       if (!this.isSceneEnabled(context)) continue;
+      // A surface showing "no results" cannot answer a command, and it must not
+      // shadow a usable surface below it.
+      if (context.getCandidates().length === 0) continue;
       return context;
     }
     return null;

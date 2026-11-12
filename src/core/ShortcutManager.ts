@@ -15,6 +15,13 @@ export interface ShortcutOptions {
   modifier: ModifierKey;
   /** Highest row number reachable, i.e. 1..maxIndex. */
   maxIndex: number;
+  /**
+   * Scene the context belongs to. Part of the registration signature so that
+   * moving a surface between scenes forces a re-register even if `enabled`
+   * happens to end up the same. Defensive: every caller goes through
+   * `reconcile`, which already folds the scene into `enabled`.
+   */
+  scene: string;
 }
 
 interface Registration {
@@ -40,7 +47,7 @@ export class ShortcutManager {
     const scope = context.scope as ScopeLike | null;
     if (!scope || typeof scope.register !== "function") return;
 
-    const signature = `${options.enabled}|${options.modifier}|${options.maxIndex}`;
+    const signature = `${options.enabled}|${options.modifier}|${options.maxIndex}|${options.scene}`;
     const existing = this.registrations.get(context.id);
     if (existing?.signature === signature) return;
 
