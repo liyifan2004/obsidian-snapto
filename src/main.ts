@@ -6,6 +6,7 @@ import { matchAll } from "./core/MatchEngine";
 import { ModifierTracker } from "./core/ModifierTracker";
 import { SearchContextManager } from "./core/SearchContextManager";
 import { ShortcutManager } from "./core/ShortcutManager";
+import { SurfaceBinder } from "./core/SurfaceBinder";
 import {
   attachPopoverSuggest,
   attachSuggestModal,
@@ -27,6 +28,21 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   private readonly patcher = new HostPatcher();
   private autoMatch: AutoMatchManager | null = null;
   private tracker: ModifierTracker | null = null;
+  private readonly binder = new SurfaceBinder({
+    contexts: this.contexts,
+    isSceneEnabled: (scene) => this.settings.scenes[scene]?.enabled === true,
+    prune: () => this.pruneDead(),
+    onAttach: (context) => {
+      this.syncContext(context);
+      this.autoMatch?.watch(context);
+      this.refreshBadges(context);
+    },
+    onReuse: (context) => {
+      this.syncContext(context);
+      this.refreshBadges(context);
+    },
+    log: (message, ...rest) => this.log(message, ...rest),
+  });
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -40,8 +56,8 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
     this.addSettingTab(new SnapToSettingTab(this.app, this));
 
     this.patcher.install({
-      onModalOpen: (modal) => this.onSurfaceOpen(() => attachSuggestModal(modal)),
-      onSuggestOpen: (host) => this.onSurfaceOpen(() => attachPopoverSuggest(host)),
+      onModalOpen: (modal) => this.binder.bind(modal, () => attachSuggestModal(modal)),
+      onSuggestOpen: (host) => this.binder.bind(host, () => attachPopoverSuggest(host)),
     });
 
     this.tracker = new ModifierTracker(activeDocument, this.settings.modifier, () =>
@@ -109,25 +125,6 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   }
 
   // ------------------------------------------------------------------ wiring
-
-  private onSurfaceOpen(attach: () => SuggestionContext | null): void {
-    this.pruneDead();
-    try {
-      const context = attach();
-      if (!context) return;
-      if (!this.settings.scenes[context.scene]?.enabled) return;
-      if (this.contexts.get(context.id)) return;
-
-      this.contexts.add(context);
-      this.syncContext(context);
-      this.autoMatch?.watch(context);
-      this.refreshBadges(context);
-      this.log("attached", context.scene, context.id);
-    } catch (error) {
-      // A single unreadable surface must not take down the others.
-      this.log("attach failed", error);
-    }
-  }
 
   /**
    * Release everything attached to surfaces that already closed.

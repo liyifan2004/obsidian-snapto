@@ -76,6 +76,7 @@ export function attachSuggestModal(modal: unknown): SuggestionContext | null {
 
   const context = new SuggestionContext({
     id: nextId(scene),
+    host: modal,
     scene,
     list,
     containerEl: container,
@@ -104,6 +105,7 @@ export function attachPopoverSuggest(host: unknown): SuggestionContext | null {
 
   return new SuggestionContext({
     id: nextId(scene),
+    host,
     scene,
     list,
     containerEl: container,

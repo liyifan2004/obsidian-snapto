@@ -42,6 +42,7 @@ function makeContext(
   document.body.appendChild(parts.container);
   return new SuggestionContext({
     id: "test",
+    host: {},
     scene: "quick-switcher",
     list: parts.list,
     containerEl: parts.container,

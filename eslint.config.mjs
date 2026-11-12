@@ -5,6 +5,7 @@ export default defineConfig([
   // Build output and Node build scripts are not plugin code.
   globalIgnores([
     "node_modules",
+    ".workbuddy",
     "main.js",
     "scripts",
     "esbuild.config.mjs",

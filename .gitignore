@@ -14,6 +14,9 @@ main.js.map
 data.json
 .DS_Store
 
+# editor / agent workspace data
+.workbuddy
+
 # test / build caches
 coverage
 .vitest

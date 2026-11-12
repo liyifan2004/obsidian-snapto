@@ -46,6 +46,8 @@ function textFromValue(value: unknown): string {
  */
 export class SuggestionContext implements SearchContext {
   readonly id: string;
+  /** The instance this context was built from. Used to avoid duplicates. */
+  readonly host: unknown;
   readonly containerEl: HTMLElement;
   readonly inputEl: HTMLElement | null;
   readonly scope: unknown;
@@ -58,6 +60,7 @@ export class SuggestionContext implements SearchContext {
 
   constructor(params: {
     id: string;
+    host: unknown;
     scene: SceneId;
     list: SuggestionListLike;
     containerEl: HTMLElement;
@@ -66,6 +69,7 @@ export class SuggestionContext implements SearchContext {
     doc: Document;
   }) {
     this.id = params.id;
+    this.host = params.host;
     this.initialScene = params.scene;
     this.list = params.list;
     this.containerEl = params.containerEl;
@@ -180,5 +184,4 @@ export class SuggestionContext implements SearchContext {
   wasManuallyMoved(withinMs: number): boolean {
     return Date.now() - this.lastNavigationAt < withinMs;
   }
-
 }

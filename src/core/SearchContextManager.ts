@@ -53,6 +53,23 @@ export class SearchContextManager {
     return this.contexts.get(id) ?? null;
   }
 
+  /**
+   * Live context built from this exact host instance, if any.
+   *
+   * A `PopoverSuggest` calls `open()` on every keystroke and returns early when
+   * already open, but our wrapper still runs. Without this lookup each keystroke
+   * would add another context, another nine key handlers and another observer.
+   */
+  findByHost(host: unknown): SuggestionContext | null {
+    for (let i = this.order.length - 1; i >= 0; i -= 1) {
+      const id = this.order[i];
+      if (id === undefined) continue;
+      const context = this.contexts.get(id);
+      if (context && context.host === host && context.isAlive()) return context;
+    }
+    return null;
+  }
+
   /** Most recent live context, or null. */
   active(): SuggestionContext | null {
     for (let i = this.order.length - 1; i >= 0; i -= 1) {
