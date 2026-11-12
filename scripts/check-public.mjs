@@ -1,21 +1,33 @@
 #!/usr/bin/env node
 /**
- * Refuse to publish internal material.
+ * Refuse to publish internal material, machine-specific paths or stale numbers.
  *
  *   node scripts/check-public.mjs
  *
- * Inspects what would go out — the commits not yet on the upstream branch, or
- * every tracked file when there is no upstream — and exits 1 if anything looks
- * like advisory notes, local tooling or credentials.
+ * Scope is what a push would publish: the files in HEAD plus anything staged.
+ * Deletions are excluded, so removing an internal file does not trip the gate
+ * that exists to catch adding one. An `upstream..HEAD` diff was the obvious
+ * alternative and was rejected: it depends on a fresh upstream ref, and checking
+ * the final tree is stricter anyway.
  *
- * Run it before pushing. It is also wired to `prepublishOnly`.
+ * Three kinds of drift are caught:
+ *   1. file names that must never be published
+ *   2. local absolute paths and concrete internal paths inside published files
+ *   3. the assertion count quoted in docs disagreeing with runtime-check.mjs
  *
- * This is a backstop. The rule that actually works is that internal documents
- * live outside the repository, under _internal/<project>/ next to it.
+ * Run it before pushing. It is wired to `prepublishOnly`, not `prepublish`,
+ * because `prepublish` also runs on `npm install`.
+ *
+ * This is a backstop, not the policy. The policy is that internal documents live
+ * outside the repository, in _internal/<project>/ next to it — a file that is not
+ * in the working tree cannot be committed by mistake. A gate that runs on your
+ * machine also cannot stop a push someone else makes; it stops the one you are
+ * about to make.
  */
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
-const RULES = [
+const NAME_RULES = [
   { test: (f) => /^docs\/TASKS-.*\.md$/i.test(f), why: "advisory task list" },
   { test: (f) => /^docs\/REVIEW-.*\.md$/i.test(f), why: "review report" },
   { test: (f) => /^docs\/.*-INTERNAL\.md$/i.test(f), why: "internal note" },
@@ -27,16 +39,31 @@ const RULES = [
   { test: (f) => /token|secret|credential/i.test(f), why: "credential-looking name" },
 ];
 
+// A drive letter is the reliable signal; the directory names below are the ones
+// this project actually lives under, which keeps the rule from flagging ordinary
+// prose.
+const CONTENT_RULES = [
+  {
+    test: (line) => /\b[A-Z]:[\\/]{1,2}(MyProjects|MyNotes|Users|Obsidian)\b/.test(line),
+    why: "absolute local path",
+  },
+  {
+    // A concrete project folder under _internal/ is machine-specific. The
+    // placeholders _internal/<project>/ and _internal/_tools/ are how the docs
+    // are supposed to describe the layout, so they stay allowed.
+    test: (line) => /_internal\/[A-Z][A-Za-z0-9-]*\//.test(line),
+    why: "concrete internal path",
+  },
+];
+
+const TEXT_FILE = /\.(md|mjs|cjs|js|ts|json|yml|yaml|css|txt)$/i;
+const ASSERTION_LINE = /(\d+)\s+assertions?\b/;
+
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 }
 
-/**
- * What a push would actually publish: the files in HEAD, plus anything staged.
- *
- * Deletions are excluded on purpose — removing an internal file must not trip
- * the gate that exists to catch adding one.
- */
+/** What a push would publish: HEAD plus staged, deletions excluded. */
 function filesInScope() {
   const staged = git(["diff", "--cached", "--name-only", "--diff-filter=d"]);
   let head = "";
@@ -48,33 +75,75 @@ function filesInScope() {
   const files = new Set(
     [...head.split("\n"), ...staged.split("\n")].map((line) => line.trim()).filter(Boolean),
   );
-  return { source: "HEAD plus staged files", files: [...files] };
+  return [...files];
 }
 
-let scope;
-try {
-  scope = filesInScope();
-} catch {
-  console.error("check-public: not a git repository, or git is unavailable.");
-  process.exit(1);
+/** Committed or staged content, falling back to the working copy. */
+function contentOf(file) {
+  try {
+    return git(["show", `:${file}`]);
+  } catch {
+    try {
+      return readFileSync(file, "utf8");
+    } catch {
+      return null;
+    }
+  }
 }
 
-const hits = [];
-for (const file of scope.files) {
-  for (const rule of RULES) {
+const files = filesInScope();
+const problems = [];
+
+for (const file of files) {
+  for (const rule of NAME_RULES) {
     if (rule.test(file)) {
-      hits.push({ file, why: rule.why });
+      problems.push(`${file}  — ${rule.why}`);
       break;
     }
   }
 }
 
-if (hits.length === 0) {
-  console.log(`check-public: clean (${scope.source}, ${scope.files.length} files).`);
+for (const file of files) {
+  if (!TEXT_FILE.test(file)) continue;
+  const content = contentOf(file);
+  if (content === null) continue;
+  const lines = content.split("\n");
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i] ?? "";
+    for (const rule of CONTENT_RULES) {
+      if (rule.test(line)) {
+        problems.push(`${file}:${i + 1}  — ${rule.why}`);
+        break;
+      }
+    }
+  }
+}
+
+// The assertion count is quoted in docs; keep it derived rather than remembered.
+const script = contentOf("scripts/runtime-check.mjs");
+if (script !== null) {
+  const actual = (script.match(/\brecord\(/g) || []).length;
+  for (const file of files) {
+    if (!/^docs\/.*\.md$/.test(file)) continue;
+    const content = contentOf(file);
+    if (content === null) continue;
+    const match = ASSERTION_LINE.exec(content);
+    if (!match) continue;
+    const quoted = Number(match[1]);
+    if (quoted !== actual) {
+      problems.push(
+        `${file}  — says ${quoted} assertions, scripts/runtime-check.mjs has ${actual} record() calls`,
+      );
+    }
+  }
+}
+
+if (problems.length === 0) {
+  console.log(`check-public: clean (${files.length} files).`);
   process.exit(0);
 }
 
-console.error(`check-public: ${hits.length} file(s) must not be published:\n`);
-for (const hit of hits) console.error(`  ${hit.file}  — ${hit.why}`);
-console.error("\nMove internal material outside the repository (see docs/DEVELOPMENT.md) and stage the removal.");
+console.error(`check-public: ${problems.length} problem(s) that must not be published:\n`);
+for (const problem of problems) console.error(`  ${problem}`);
+console.error("\nInternal material belongs outside the repository (see docs/DEVELOPMENT.md).");
 process.exit(1);

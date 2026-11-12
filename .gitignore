@@ -30,3 +30,6 @@ docs/REVIEW-*.md
 docs/*-INTERNAL.md
 internal/
 *.local.md
+
+# Machine-specific operations scripts (credentials, local proxy ports).
+*.ps1
