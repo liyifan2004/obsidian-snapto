@@ -17,7 +17,48 @@ export class Platform {
   static isMobile = false;
 }
 
-export class Plugin {}
+interface CommandSpec {
+  id: string;
+  name?: string;
+  callback?: () => void;
+  checkCallback?: (checking: boolean) => boolean;
+}
+
+/**
+ * Enough of `Plugin` for `onload()` to run: data access, command and settings
+ * registration. The orchestration test drives the real plugin class, so this
+ * stand-in has to behave like the base class rather than being a blank.
+ */
+export class Plugin {
+  app: unknown;
+  manifest: unknown;
+  readonly commands: CommandSpec[] = [];
+  readonly settingTabs: unknown[] = [];
+  private data: unknown = null;
+
+  constructor(app?: unknown, manifest?: unknown) {
+    this.app = app;
+    this.manifest = manifest;
+  }
+
+  async loadData(): Promise<unknown> {
+    // Obsidian round-trips through disk, so tests must not share the object.
+    return this.data === null ? null : structuredClone(this.data);
+  }
+
+  async saveData(data: unknown): Promise<void> {
+    this.data = structuredClone(data);
+  }
+
+  addCommand(spec: CommandSpec): CommandSpec {
+    this.commands.push(spec);
+    return spec;
+  }
+
+  addSettingTab(tab: unknown): void {
+    this.settingTabs.push(tab);
+  }
+}
 
 /**
  * Stand-ins that mirror the real hierarchy: `SuggestModal` and `PopoverSuggest`
@@ -39,7 +80,19 @@ export class Modal {
 
 export class SuggestModal extends Modal {}
 export class PopoverSuggest extends Modal {}
-export class PluginSettingTab {}
+export class PluginSettingTab {
+  app: unknown;
+  plugin: unknown;
+  containerEl: HTMLElement;
+
+  constructor(app: unknown, plugin: unknown) {
+    this.app = app;
+    this.plugin = plugin;
+    this.containerEl = document.createElement("div");
+  }
+
+  display(): void {}
+}
 export class Notice {
   constructor(_message: string) {}
 }

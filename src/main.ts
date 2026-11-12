@@ -30,19 +30,8 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   private tracker: ModifierTracker | null = null;
   private readonly binder = new SurfaceBinder({
     contexts: this.contexts,
-    isSceneEnabled: (scene) => this.settings.scenes[scene]?.enabled === true,
     prune: () => this.pruneDead(),
-    onAttach: (context) => {
-      this.tracker?.attachDocument(context.containerEl.ownerDocument);
-      this.syncContext(context);
-      this.autoMatch?.watch(context);
-      this.refreshBadges(context);
-    },
-    onReuse: (context) => {
-      this.tracker?.attachDocument(context.containerEl.ownerDocument);
-      this.syncContext(context);
-      this.refreshBadges(context);
-    },
+    onBind: (context) => this.reconcile(context),
     log: (message, ...rest) => this.log(message, ...rest),
   });
 
@@ -99,21 +88,15 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
     await this.saveData(this.settings);
   }
 
+  /** Settings synced from another device: reload, then bring open surfaces along. */
+  async onExternalSettingsChange(): Promise<void> {
+    await this.loadSettings();
+    this.onSettingsChanged();
+  }
+
   onSettingsChanged(): void {
     this.tracker?.setModifier(this.settings.modifier);
-
-    for (const context of this.contexts.all()) {
-      if (this.settings.scenes[context.scene]?.enabled) {
-        this.syncContext(context);
-        this.refreshBadges(context);
-        continue;
-      }
-      // The scene was switched off while its surface is still open: drop
-      // everything we added so it behaves like stock Obsidian right away.
-      this.shortcuts.dispose(context.id);
-      this.autoMatch?.unwatch(context.id);
-      this.badges.clear(context);
-    }
+    for (const context of this.contexts.all()) this.reconcile(context);
   }
 
   /** Settings → matcher options, the only place they are derived. */
@@ -126,9 +109,13 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
     };
   }
 
+  private isSceneEnabled(context: SuggestionContext): boolean {
+    return this.settings.scenes[context.scene]?.enabled === true;
+  }
+
   private buildConfig(context: SuggestionContext): AutoMatchConfig | null {
     if (!this.settings.autoMatchEnabled) return null;
-    if (!this.settings.scenes[context.scene]?.enabled) return null;
+    if (!this.isSceneEnabled(context)) return null;
     return {
       enabled: true,
       action: this.settings.autoMatchAction,
@@ -139,6 +126,24 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   }
 
   // ------------------------------------------------------------------ wiring
+
+  /**
+   * Bring one live surface in line with current settings.
+   *
+   * Every path that can change state — first attach, repeat open, settings
+   * change, external sync — ends here. Keeping the three effects together is
+   * what makes them impossible to leave half-applied: there is no "remember to
+   * re-enable the watcher" branch to forget.
+   *
+   * Idempotent: `ShortcutManager.sync` compares a signature, `AutoMatchManager.watch`
+   * returns when a watcher exists, and badge rendering rewrites the same nodes.
+   */
+  private reconcile(context: SuggestionContext): void {
+    this.tracker?.attachDocument(context.containerEl.ownerDocument);
+    this.syncContext(context);
+    this.refreshBadges(context);
+    this.autoMatch?.watch(context);
+  }
 
   /**
    * Release everything attached to surfaces that already closed.
@@ -158,24 +163,43 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
 
   private syncContext(context: SuggestionContext): void {
     this.shortcuts.sync(context, {
-      enabled: this.settings.quickSelectEnabled,
+      // A disabled scene must lose its keys even while quick select stays on.
+      enabled: this.settings.quickSelectEnabled && this.isSceneEnabled(context),
       modifier: this.settings.modifier,
       maxIndex: MAX_SHORTCUTS,
     });
   }
 
   private refreshBadges(context: SuggestionContext): void {
-    if (this.settings.showBadges) {
+    if (this.settings.showBadges && this.isSceneEnabled(context)) {
       this.badges.apply(context, this.settings.badgeStyle === "always");
     } else {
       this.badges.clear(context);
     }
   }
 
+  /**
+   * Newest live context whose scene is enabled.
+   *
+   * Contexts of disabled scenes stay in the registry on purpose: removing them
+   * would mean the surface cannot come back until it is reopened, and a modal
+   * does not reopen on its own. They are filtered here instead, so a disabled
+   * scene cannot feed commands, `match-now` or the navigation tracker.
+   */
+  private activeEnabledContext(): SuggestionContext | null {
+    const ordered = this.contexts.all();
+    for (let i = ordered.length - 1; i >= 0; i -= 1) {
+      const context = ordered[i];
+      if (!context || !context.isAlive()) continue;
+      if (!this.isSceneEnabled(context)) continue;
+      return context;
+    }
+    return null;
+  }
+
   /** Arrow keys inside a list mean "I am choosing", so auto match backs off. */
   private noteNavigation(): void {
-    const active = this.contexts.active();
-    if (active) active.noteManualNavigation();
+    this.activeEnabledContext()?.noteManualNavigation();
   }
 
   // ---------------------------------------------------------------- commands
@@ -185,7 +209,7 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
       id: "match-now",
       name: t("cmdMatchNow"),
       callback: () => {
-        const active = this.contexts.active();
+        const active = this.activeEnabledContext();
         if (!active) {
           new Notice(t("noticeNoContext"));
           return;
@@ -208,6 +232,8 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
       name: t("cmdToggleAutoMatch"),
       callback: () => {
         this.settings.autoMatchEnabled = !this.settings.autoMatchEnabled;
+        // Same path as the settings page, so live surfaces follow immediately.
+        this.onSettingsChanged();
         void this.saveSettings();
         new Notice(
           this.settings.autoMatchEnabled ? t("noticeAutoMatchOn") : t("noticeAutoMatchOff"),
@@ -221,7 +247,7 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
         id: `select-result-${n}`,
         name: t("cmdSelectResult", { n }),
         checkCallback: (checking: boolean) => {
-          const active = this.contexts.active();
+          const active = this.activeEnabledContext();
           if (!active) return false;
           const candidates = active.getCandidates();
           if (index >= candidates.length) return false;

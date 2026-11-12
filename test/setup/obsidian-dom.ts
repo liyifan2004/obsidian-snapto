@@ -39,6 +39,13 @@ function buildElement<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
+// `main.ts` reaches for this at load time; jsdom has no such global.
+(globalThis as unknown as Record<string, unknown>).activeDocument = document;
+
+globalThis.createSpan = function createSpan(info?: string | DomElementInfo): HTMLSpanElement {
+  return buildElement("span", info);
+};
+
 globalThis.createEl = function createEl<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   info?: string | DomElementInfo,

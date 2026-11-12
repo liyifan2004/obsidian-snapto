@@ -51,14 +51,14 @@ function makeHost(titles: string[]) {
   return { host, list, container, values };
 }
 
-function makeBinder(enabled = true) {
+function makeBinder() {
   const contexts = new SearchContextManager();
   const shortcuts = new ShortcutManager();
+  const binds = vi.fn();
   const log = vi.fn();
 
   const binder = new SurfaceBinder({
     contexts,
-    isSceneEnabled: () => enabled,
     prune: () => {
       for (const context of contexts.all()) {
         if (context.isAlive()) continue;
@@ -66,14 +66,15 @@ function makeBinder(enabled = true) {
         contexts.remove(context.id);
       }
     },
-    onAttach: (context) => {
+    // Every bind goes through here, first attach and reuse alike.
+    onBind: (context) => {
+      binds(context);
       shortcuts.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
     },
-    onReuse: () => {},
     log,
   });
 
-  return { binder, contexts, shortcuts, log };
+  return { binder, contexts, shortcuts, binds, log };
 }
 
 function attachFrom(parts: ReturnType<typeof makeHost>, id: string) {
@@ -122,6 +123,18 @@ describe("SurfaceBinder", () => {
     expect(second).toBe(first);
   });
 
+  it("reconciles on every bind, first attach and reuse alike", () => {
+    const parts = makeHost(["Alpha"]);
+    const { binder, binds } = makeBinder();
+
+    binder.bind(parts.host, attachFrom(parts, "ctx-1"));
+    binder.bind(parts.host, attachFrom(parts, "ctx-2"));
+
+    // Scene state is applied in onBind, so a repeat open re-applies it rather
+    // than resurrecting what a settings change switched off.
+    expect(binds).toHaveBeenCalledTimes(2);
+  });
+
   it("starts a fresh context once the previous one closed", () => {
     const first = makeHost(["Alpha"]);
     const second = makeHost(["Beta"]);
@@ -137,15 +150,17 @@ describe("SurfaceBinder", () => {
     expect(contexts.active()?.id).toBe("ctx-b");
   });
 
-  it("ignores a scene that settings disabled", () => {
+  it("keeps a surface whose list is empty", () => {
     const parts = makeHost(["Alpha"]);
-    const { binder, contexts, shortcuts } = makeBinder(false);
+    const { binder, contexts } = makeBinder();
 
-    const result = binder.bind(parts.host, attachFrom(parts, "ctx-1"));
+    binder.bind(parts.host, attachFrom(parts, "ctx-1"));
+    // A query with no results: the container is still mounted.
+    parts.list.values = [];
 
-    expect(result).toBeNull();
-    expect(contexts.size()).toBe(0);
-    expect(shortcuts.count()).toBe(0);
+    expect(contexts.findByHost(parts.host)).not.toBeNull();
+    binder.bind(parts.host, attachFrom(parts, "ctx-2"));
+    expect(contexts.size()).toBe(1);
   });
 
   it("survives an adapter that throws", () => {

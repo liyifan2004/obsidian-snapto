@@ -193,11 +193,17 @@ describe("SuggestionContext", () => {
     expect(context.isAlive()).toBe(false);
   });
 
-  it("goes dead when the list empties", () => {
+  it("stays alive when the list empties", () => {
     const parts = buildList([{ title: "Alpha" }]);
     const context = makeContext(parts);
 
+    // No results is a normal state while the surface is still mounted.
     parts.list.values = [];
+    expect(context.isAlive()).toBe(true);
+    expect(context.getCandidates()).toHaveLength(0);
+
+    // Only losing the container ends the surface.
+    parts.container.remove();
     expect(context.isAlive()).toBe(false);
   });
 

@@ -182,8 +182,16 @@ export class SuggestionContext implements SearchContext {
     return new Ctor("keydown", { key: "Enter", bubbles: true });
   }
 
+  /**
+   * Alive means the host still has the container in the document.
+   *
+   * An empty result set is a normal state — the user typed something that
+   * matches nothing — so `values.length` deliberately plays no part here.
+   * Treating it as death used to drop the watcher and re-create the context
+   * (with a new id) as soon as results came back.
+   */
   isAlive(): boolean {
-    return this.containerEl.isConnected && this.getValues().length > 0;
+    return this.containerEl.isConnected;
   }
 
   noteManualNavigation(): void {

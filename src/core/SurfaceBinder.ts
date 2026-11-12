@@ -1,17 +1,12 @@
-import type { SceneId } from "../types";
 import type { SearchContextManager } from "./SearchContextManager";
 import type { SuggestionContext } from "./SuggestionContext";
 
 export interface SurfaceBinderDeps {
   contexts: SearchContextManager;
-  /** Is this scene allowed by settings? */
-  isSceneEnabled(scene: SceneId): boolean;
   /** Release surfaces that already closed. */
   prune(): void;
-  /** First time this host is seen: shortcuts, watcher and badges. */
-  onAttach(context: SuggestionContext): void;
-  /** Same host opened again: refresh what depends on current settings. */
-  onReuse(context: SuggestionContext): void;
+  /** Bring one context in line with current settings. Must be idempotent. */
+  onBind(context: SuggestionContext): void;
   log(message: string, ...rest: unknown[]): void;
 }
 
@@ -22,6 +17,11 @@ export interface SurfaceBinderDeps {
  * the popover is already open, but our wrapper still runs on every keystroke;
  * without this, typing four characters would create four contexts, 36 keymap
  * handlers, four observers and four concurrent auto-match timers.
+ *
+ * Both branches call `onBind`, deliberately. A surface that opens again while
+ * its scene is disabled has to pass through the same reconciliation as any
+ * other, otherwise turning a scene off would be undone by the next keystroke.
+ * Whether the scene is enabled is decided there, in one place, not here.
  */
 export class SurfaceBinder {
   constructor(private readonly deps: SurfaceBinderDeps) {}
@@ -32,7 +32,7 @@ export class SurfaceBinder {
     const existing = this.deps.contexts.findByHost(host);
     if (existing) {
       this.deps.contexts.touch(existing.id);
-      this.deps.onReuse(existing);
+      this.deps.onBind(existing);
       this.deps.log("reused", existing.scene, existing.id);
       return existing;
     }
@@ -46,13 +46,9 @@ export class SurfaceBinder {
       return null;
     }
     if (!context) return null;
-    if (!this.deps.isSceneEnabled(context.scene)) {
-      this.deps.log("scene disabled", context.scene);
-      return null;
-    }
 
     this.deps.contexts.add(context);
-    this.deps.onAttach(context);
+    this.deps.onBind(context);
     this.deps.log("attached", context.scene, context.id);
     return context;
   }
