@@ -1,7 +1,5 @@
 import type { SuggestionContext } from "./SuggestionContext";
 
-export type ContextListener = (contexts: readonly SuggestionContext[]) => void;
-
 /**
  * Keeps every live search surface, newest first.
  *
@@ -9,16 +7,18 @@ export type ContextListener = (contexts: readonly SuggestionContext[]) => void;
  * or an editor suggest while a modal is still mounted. "Active" therefore means
  * "most recently touched and still attached to the document", never "the only
  * one".
+ *
+ * There is deliberately no subscription mechanism: the plugin reconciles every
+ * context itself when settings change, and a listener registry with no second
+ * consumer is just another place for state to drift.
  */
 export class SearchContextManager {
   private readonly contexts = new Map<string, SuggestionContext>();
   private readonly order: string[] = [];
-  private readonly listeners = new Set<ContextListener>();
 
   add(context: SuggestionContext): void {
     this.contexts.set(context.id, context);
     this.touch(context.id);
-    this.emit();
   }
 
   /** Mark a context as the most recent one, e.g. on focus or keystroke. */
@@ -32,21 +32,6 @@ export class SearchContextManager {
     if (!this.contexts.delete(id)) return;
     const index = this.order.indexOf(id);
     if (index >= 0) this.order.splice(index, 1);
-    this.emit();
-  }
-
-  /** Drop surfaces whose container left the document. */
-  prune(): void {
-    let changed = false;
-    for (const [id, context] of this.contexts) {
-      if (!context.isAlive()) {
-        this.contexts.delete(id);
-        const index = this.order.indexOf(id);
-        if (index >= 0) this.order.splice(index, 1);
-        changed = true;
-      }
-    }
-    if (changed) this.emit();
   }
 
   get(id: string): SuggestionContext | null {
@@ -91,25 +76,8 @@ export class SearchContextManager {
     return this.contexts.size;
   }
 
-  subscribe(listener: ContextListener): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-
   clear(): void {
     this.contexts.clear();
     this.order.length = 0;
-    this.emit();
-  }
-
-  private emit(): void {
-    const snapshot = this.all();
-    for (const listener of this.listeners) {
-      try {
-        listener(snapshot);
-      } catch {
-        // One bad listener must not break the others.
-      }
-    }
   }
 }

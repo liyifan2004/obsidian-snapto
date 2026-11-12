@@ -71,16 +71,3 @@ export interface SearchContext {
   /** True when the highlight was moved by hand within the last `withinMs`. */
   wasManuallyMoved(withinMs: number): boolean;
 }
-
-/**
- * An adapter turns a host object (a modal instance, a suggestion popover) into
- * a `SearchContext`. Adapters must never throw: a broken adapter should only
- * lose its own scene.
- */
-export interface SearchAdapter {
-  readonly id: string;
-  /** Scenes this adapter can produce. */
-  readonly scenes: readonly SceneId[];
-  /** Called when the host surface opens. Return null to opt out. */
-  attach(host: unknown): SearchContext | null;
-}
