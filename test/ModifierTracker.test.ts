@@ -5,12 +5,21 @@ import { MODIFIER_BODY_CLASS, ModifierTracker } from "../src/core/ModifierTracke
 function fakeDocument() {
   const body = createEl("div");
   const listeners = new Set<string>();
-  const win = {
-    addEventListener: vi.fn((type: string) => listeners.add(type)),
-    removeEventListener: vi.fn((type: string) => listeners.delete(type)),
+  const handlers = new Map<string, (evt: Event) => void>();
+  const win: Record<string, unknown> = {
+    addEventListener: vi.fn((type: string, handler: (evt: Event) => void) => {
+      listeners.add(type);
+      handlers.set(type, handler);
+    }),
+    removeEventListener: vi.fn((type: string) => {
+      listeners.delete(type);
+      handlers.delete(type);
+    }),
   };
   const doc = { body, defaultView: win } as unknown as Document;
-  return { doc, body, win, listeners };
+  // `pagehide` targets the window, and the handler reads the document off it.
+  win.document = doc;
+  return { doc, body, win, listeners, handlers };
 }
 
 function keyDown(key: string): KeyboardEvent {
@@ -113,6 +122,45 @@ describe("ModifierTracker", () => {
     tracker.attachDocument(popout.doc);
 
     expect(popout.body.classList.contains(MODIFIER_BODY_CLASS)).toBe(true);
+    tracker.stop();
+  });
+
+  it("releases a document that is detached", () => {
+    const tracker = new ModifierTracker(document, "Mod", () => {});
+    const popout = fakeDocument();
+
+    tracker.start();
+    tracker.attachDocument(popout.doc);
+    expect(tracker.documentCount()).toBe(2);
+
+    tracker.detachDocument(popout.doc);
+
+    expect(tracker.documentCount()).toBe(1);
+    expect(popout.listeners.size).toBe(0);
+    expect(popout.body.classList.contains(MODIFIER_BODY_CLASS)).toBe(false);
+
+    // The remaining document still works.
+    window.dispatchEvent(keyDown("Control"));
+    expect(document.body.classList.contains(MODIFIER_BODY_CLASS)).toBe(true);
+
+    tracker.stop();
+  });
+
+  it("detaches on pagehide from that window", () => {
+    const tracker = new ModifierTracker(document, "Mod", () => {});
+    const popout = fakeDocument();
+
+    tracker.start();
+    tracker.attachDocument(popout.doc);
+
+    const pagehide = popout.handlers.get("pagehide");
+    expect(pagehide).toBeDefined();
+
+    pagehide?.({ target: popout.win } as unknown as Event);
+
+    expect(tracker.documentCount()).toBe(1);
+    expect(popout.listeners.has("pagehide")).toBe(false);
+
     tracker.stop();
   });
 

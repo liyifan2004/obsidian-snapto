@@ -55,6 +55,13 @@ export class ModifierTracker {
     if (this.down) this.setDown(false);
   };
 
+  /** A closed popout must stop holding a reference and stop receiving classes. */
+  private readonly onPageHide = (evt: Event): void => {
+    const target = evt.target as { document?: Document } | null;
+    const doc = target?.document;
+    if (doc) this.detachDocument(doc);
+  };
+
   constructor(
     private readonly primaryDoc: Document,
     modifier: ModifierKey,
@@ -81,19 +88,27 @@ export class ModifierTracker {
     win.addEventListener("keydown", this.onKeyDown, true);
     win.addEventListener("keyup", this.onKeyUp, true);
     win.addEventListener("blur", this.onBlur);
+    // Standard DOM event, no Obsidian API involved. Whether Electron fires it
+    // for a popout is checked in the runtime pass, not assumed here.
+    win.addEventListener("pagehide", this.onPageHide);
     // A surface can open while the modifier is already held.
     if (this.down) doc.body.addClass(MODIFIER_BODY_CLASS);
   }
 
+  /** Stop tracking one document, e.g. after its window went away. */
+  detachDocument(doc: Document): void {
+    if (!this.docs.delete(doc)) return;
+    const win = doc.defaultView;
+    win?.removeEventListener("keydown", this.onKeyDown, true);
+    win?.removeEventListener("keyup", this.onKeyUp, true);
+    win?.removeEventListener("blur", this.onBlur);
+    win?.removeEventListener("pagehide", this.onPageHide);
+    doc.body.removeClass(MODIFIER_BODY_CLASS);
+  }
+
   stop(): void {
-    for (const doc of this.docs) {
-      const win = doc.defaultView;
-      win?.removeEventListener("keydown", this.onKeyDown, true);
-      win?.removeEventListener("keyup", this.onKeyUp, true);
-      win?.removeEventListener("blur", this.onBlur);
-      doc.body.removeClass(MODIFIER_BODY_CLASS);
-    }
-    this.docs.clear();
+    this.setDown(false);
+    for (const doc of Array.from(this.docs)) this.detachDocument(doc);
     this.down = false;
   }
 
