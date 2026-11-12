@@ -13,9 +13,21 @@ npm run verify     # typecheck + test + lint + build
 npm run sync "<vault path>"
 ```
 
-`verify` is the gate before every commit. `sync` copies `main.js`, `manifest.json`, `styles.css` into `<vault>/.obsidian/plugins/snapto/`; it never touches `data.json`.
+`verify` is the gate before every commit. `check:public` is the gate before every push — `npm run check:public`. `sync` copies `main.js`, `manifest.json`, `styles.css` into `<vault>/.obsidian/plugins/snapto/`; it never touches `data.json`.
 
 `main.js` is not in git — it ships as a release asset.
+
+## Public surface
+
+This repository is public. `docs/` is for readers and contributors only: architecture, compatibility, decisions, roadmap.
+
+Internal material — advisory task lists, review reports, evaluation notes — goes to `D:/MyProjects/_internal/Obsidian-SnapTo/`, outside the repository. Cross-project tooling goes to `D:/MyProjects/_internal/_tools/`. Files outside the working tree cannot be committed by accident, which is a stronger guarantee than any ignore rule.
+
+`.gitignore` covers `docs/TASKS-*.md`, `docs/REVIEW-*.md`, `docs/*-INTERNAL.md`, `internal/` and `*.local.md` as a backstop. `scripts/check-public.mjs` checks the files a push would publish (HEAD plus staged, deletions excluded) and refuses on those patterns, on any `*.ps1`, on `.env*` and on credential-looking names.
+
+Run `npm run check:public` before pushing. It is also wired to `prepublishOnly`, not `prepublish`, so `npm install` does not trigger it.
+
+Creating a repository, changing its visibility, or pushing it for the first time is a decision for the user, not a default action.
 
 ## Testing
 
@@ -52,6 +64,18 @@ The interesting failures (wrong scene, wrong index, no badge) only appear at run
 5. `Page.captureScreenshot` for the visual pass; the settings live in a separate window and need their own CDP target.
 
 Start and stop the instance inside one shell command, otherwise the child process is reaped when the command ends.
+
+### Comparing against an older build
+
+To prove a runtime assertion actually observes a bug, run it against the build that had the bug. Export the old sources instead of touching the working tree:
+
+```bash
+mkdir -p /tmp/snapto-old && git archive 6944377 src | tar -x -C /tmp/snapto-old
+```
+
+Then build that tree separately and point the vault at it. Do **not** use `git switch`, `git checkout`, `git restore`, `git stash` or `reset --hard` for this — the working tree may be holding someone else's in-progress edits, and the shared-repository rules in `D:/MyNotes/学-习/.git操作硬约束.md` forbid those commands outright.
+
+Keep the output of the comparison outside the repository, under `_internal/<project>/`; the public repo does not need a verification log.
 
 ### Check list for a new Obsidian release
 
