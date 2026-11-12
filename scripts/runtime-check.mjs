@@ -215,15 +215,15 @@ await sleep(400);
 
 const popoverReady = await ev(
   `(async () => {
-     if (!document.querySelector(".metadata-add-button")) {
-       const file = app.vault.getAbstractFileByPath("Daily Note.md");
-       if (!file) return { error: "note missing" };
-       const leaf = app.workspace.getLeaf(false);
-       await leaf.openFile(file);
-       await new Promise((resolve) => setTimeout(resolve, 600));
-       await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: "source" } });
-       await new Promise((resolve) => setTimeout(resolve, 500));
-     }
+     const file = app.vault.getAbstractFileByPath("Daily Note.md");
+     if (!file) return { error: "note missing" };
+     // A property written by an earlier run would make this query match nothing.
+     await app.vault.modify(file, "");
+     const leaf = app.workspace.getLeaf(false);
+     await leaf.openFile(file);
+     await new Promise((resolve) => setTimeout(resolve, 600));
+     await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: "source" } });
+     await new Promise((resolve) => setTimeout(resolve, 500));
      const addButton = document.querySelector(".metadata-add-button .text-icon-button, .metadata-add-button");
      if (!addButton) return { error: "no add-property button" };
      addButton.click();
