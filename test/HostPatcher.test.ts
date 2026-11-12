@@ -75,6 +75,35 @@ describe("HostPatcher", () => {
     expect(callbacks.onModalOpen).not.toHaveBeenCalled();
   });
 
+  it("leaves a third-party wrapper installed after us in place", () => {
+    const callbacks = handlers();
+    patcher = new HostPatcher();
+    patcher.install(callbacks);
+
+    // Another plugin wraps the method after we did, calling through to us.
+    const ourLayer = Object.getOwnPropertyDescriptor(SuggestModal.prototype, "open")
+      ?.value as ((this: unknown) => void) | undefined;
+    const outerCalls: string[] = [];
+    const outer = function (this: unknown): void {
+      outerCalls.push("outer");
+      ourLayer?.call(this);
+    };
+    SuggestModal.prototype.open = outer;
+
+    patcher.uninstall();
+    patcher = null;
+
+    // Their layer must survive; ours must go quiet.
+    const installed = Object.getOwnPropertyDescriptor(SuggestModal.prototype, "open")?.value as unknown;
+    expect(installed).toBe(outer);
+    const modal = new SuggestModal();
+    modal.open();
+
+    expect(outerCalls).toEqual(["outer"]);
+    expect(callbacks.onModalOpen).not.toHaveBeenCalled();
+    expect(modal.openCount).toBe(1);
+  });
+
   it("can be installed twice without stacking", () => {
     const callbacks = handlers();
     patcher = new HostPatcher();
