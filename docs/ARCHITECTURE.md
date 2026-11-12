@@ -45,7 +45,7 @@ Obsidian calls SuggestModal.open()
       watch         → AutoMatchManager.watch (no-op if already watching)
 ```
 
-`SearchContextManager` keeps *every* live context, newest last. `active()` returns the most recent one whose container is still in the document, which is what makes nested surfaces (a modal over a popover) behave.
+`SearchContextManager` keeps *every* live context, newest last, and does no filtering: which one to act on depends on scene settings it knows nothing about. `main.activeEnabledContext()` walks that list newest-first and picks the first context that is alive, belongs to an enabled scene, and currently has results — a surface showing "no results" cannot answer a command and must not shadow a usable one below it.
 
 ### Typing
 

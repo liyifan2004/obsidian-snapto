@@ -31,6 +31,7 @@ Suggestion dialogs opened by other plugins go through the same code path, but no
 - No global search panel support. The panel has no selection model to drive; see [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
 - No in-note find (`Ctrl+F`). It highlights text inside the document, it is not a result list.
 - No native outline search. Obsidian's outline is a view, not a search box.
+- Nothing inside the settings window. That window runs in its own context, so the suggestion lists there are not touched at all.
 
 The full list of surfaces, environments and how each was verified is in [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
 

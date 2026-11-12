@@ -8,9 +8,9 @@ Two shipped bundles were unpacked and read (`resources/obsidian.asar` → `app.j
 
 | Install | Bundle reports | Use |
 | --- | --- | --- |
-| `C:\Users\…\AppData\Local\Obsidian` (stale copy) | 1.5.12 | bundle read only |
-| `D:\Obsidian` (the copy actually running) | 1.13.4 | bundle read only |
-| `D:\Obsidian`, after the in-app update | 1.15.1 | runtime baseline |
+| an older install left behind on disk | 1.5.12 | bundle read only |
+| the install in use | 1.13.4 | bundle read only |
+| the same install after an in-app update | 1.15.1 | runtime baseline |
 
 Bundle reading covers 1.5.12 and 1.13.4. Everything described as verified at runtime was exercised on **1.15.1** in an isolated vault (`--remote-debugging-port`, separate `--user-data-dir`), driving the real keymap and the real suggestion lists.
 

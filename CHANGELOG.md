@@ -19,6 +19,8 @@ Turning a scene off now stays off.
 
 - `SearchContextManager` lost an unused listener registry and `types` lost the unused `SearchAdapter`.
 - The runtime check now exercises a real `AbstractInputSuggest` (the property-name field) for dedupe, instead of the quick switcher, where the assertion could not fail.
+- Settings changes prune closed surfaces before reconciling, and a surface showing no results no longer shadows a usable one below it.
+- Removed internal collaboration documents from the repository. No runtime behaviour is affected; the old commits still contain them.
 
 ## [0.1.1] - 2026-11-13
 

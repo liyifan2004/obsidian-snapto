@@ -31,6 +31,7 @@ SnapTo 不新增搜索框。它作用在 Obsidian 已有的建议列表上。
 - 不支持全局搜索面板。那个面板没有可供驱动的选中模型，详见 [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)。
 - 不支持笔记内查找（`Ctrl+F`）。它高亮的是正文文字，不是结果列表。
 - 不支持原生大纲搜索。Obsidian 的大纲是个视图，不是搜索框。
+- 设置窗口里的一切都不管。那个窗口跑在独立的运行环境里，里面的建议列表完全不受影响。
 
 各入口、各环境的实际情况与验证方式见 [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)。
 

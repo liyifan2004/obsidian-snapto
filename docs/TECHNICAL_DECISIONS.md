@@ -325,3 +325,53 @@ The alternative is tracking "am I still the outermost wrapper" across reloads, w
 
 - After several reloads in a session, a keystroke may pass through two or three inert frames. Measured cost: a function call.
 - Anyone reading the prototype chain later should know this is deliberate; hence this record.
+
+---
+
+## 0015. Runtime checks get a negative control
+
+**Date:** 2026-11-13 · **Status:** accepted
+
+### Context
+
+A runtime assertion that passes proves nothing on its own: it may be looking at the wrong surface, or at a state the bug cannot reach. The dedupe assertion shipped in 0.1.1 was exactly that — it re-typed into the quick switcher, which never calls `open()` twice, so it passed on 0.1.0 as well.
+
+### Decision
+
+Every runtime assertion that claims to catch a specific historical bug is run once against the build that had the bug. The old sources are exported with `git archive <sha> src` into a scratch directory, built there, and swapped into a throwaway vault. The current working tree is never touched.
+
+### Rationale
+
+`git checkout` would work and is what was used the first time, but it is forbidden by the shared-repository rules this machine follows, and it edits files another process may be holding. `git archive` produces the same bytes without touching the tree.
+
+The second half matters as much: "instrumentation says 3" and "the bug is observable" are different claims. A counter that only exists in the new build cannot serve as its own control; the control has to be an assertion whose failure means the bug is present.
+
+### Consequences
+
+- Results live outside the repository (`_internal/<project>/negative-control/`); the public repo does not need a verification log, but the team does.
+- The 0.1.2 check now has both: `one context served all three keystrokes` fails on 0.1.0 (id drift), and `three keystrokes caused three opens` proves the three opens really happened on the current build.
+
+---
+
+## 0016. Closed popouts are released lazily
+
+**Date:** 2026-11-13 · **Status:** accepted, known limit
+
+### Context
+
+`ModifierTracker` keeps one listener set per document. A closed popout should release its entry. `pagehide` was tried first; measured on 1.15.1, it does not fire when Electron closes a popout — the tracked count stayed at 2 while the window was already gone from the target list.
+
+### Decision
+
+Sweep on `Window.closed` (or a null `defaultView`) at the start of every `attachDocument`, and delete the `pagehide` branch entirely.
+
+### Rationale
+
+`pagehide` also carried a bug: it read `evt.target.document`, which is undefined for a window target, and `detachDocument` then touched `doc.body`, which a closing window may have dropped. That exception would have propagated into `reconcile` and been swallowed by `HostPatcher`, silently skipping the shortcuts, badges and watcher for that bind — a rare failure that would have been very hard to attribute.
+
+The sweep is lazy: a window that closes while nothing else opens stays referenced until the next surface opens. That costs one `Document` and four listeners, and the alternative — polling, or a window lifecycle event Obsidian does not expose — is more machinery than the leak is worth.
+
+### Consequences
+
+- A session that opens a popout and never opens another surface keeps that document referenced until unload. Accepted, and written down rather than left to be rediscovered.
+- If a future Obsidian release starts firing `pagehide` for popouts, nothing breaks: the sweep still runs, and `stop()` covers the rest.
