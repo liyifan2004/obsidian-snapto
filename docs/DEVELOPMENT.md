@@ -21,7 +21,7 @@ npm run sync "<vault path>"
 
 This repository is public. `docs/` is for readers and contributors only: architecture, compatibility, decisions, roadmap.
 
-Internal material — advisory task lists, review reports, evaluation notes — goes to `D:/MyProjects/_internal/Obsidian-SnapTo/`, outside the repository. Cross-project tooling goes to `D:/MyProjects/_internal/_tools/`. Files outside the working tree cannot be committed by accident, which is a stronger guarantee than any ignore rule.
+Internal material — advisory task lists, review reports, evaluation notes — goes to `_internal/<project>/` next to the repository, not inside it. Cross-project tooling goes to `_internal/_tools/`. Files outside the working tree cannot be committed by accident, which is a stronger guarantee than any ignore rule.
 
 `.gitignore` covers `docs/TASKS-*.md`, `docs/REVIEW-*.md`, `docs/*-INTERNAL.md`, `internal/` and `*.local.md` as a backstop. `scripts/check-public.mjs` checks the files a push would publish (HEAD plus staged, deletions excluded) and refuses on those patterns, on any `*.ps1`, on `.env*` and on credential-looking names.
 
@@ -73,7 +73,7 @@ To prove a runtime assertion actually observes a bug, run it against the build t
 mkdir -p /tmp/snapto-old && git archive 6944377 src | tar -x -C /tmp/snapto-old
 ```
 
-Then build that tree separately and point the vault at it. Do **not** use `git switch`, `git checkout`, `git restore`, `git stash` or `reset --hard` for this — the working tree may be holding someone else's in-progress edits, and the shared-repository rules in `D:/MyNotes/学-习/.git操作硬约束.md` forbid those commands outright.
+Then build that tree separately and point the vault at it. Do **not** use `git switch`, `git checkout`, `git restore`, `git stash` or `reset --hard` for this — the working tree may be holding someone else's in-progress edits, and this project follows a set of git safety rules that forbid those commands outright.
 
 Keep the output of the comparison outside the repository, under `_internal/<project>/`; the public repo does not need a verification log.
 

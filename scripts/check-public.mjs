@@ -11,7 +11,7 @@
  * Run it before pushing. It is also wired to `prepublishOnly`.
  *
  * This is a backstop. The rule that actually works is that internal documents
- * live outside the repository: D:/MyProjects/_internal/<project>/.
+ * live outside the repository, under _internal/<project>/ next to it.
  */
 import { execFileSync } from "node:child_process";
 
@@ -76,5 +76,5 @@ if (hits.length === 0) {
 
 console.error(`check-public: ${hits.length} file(s) must not be published:\n`);
 for (const hit of hits) console.error(`  ${hit.file}  — ${hit.why}`);
-console.error("\nMove internal material to D:/MyProjects/_internal/<project>/ and stage the removal.");
+console.error("\nMove internal material outside the repository (see docs/DEVELOPMENT.md) and stage the removal.");
 process.exit(1);

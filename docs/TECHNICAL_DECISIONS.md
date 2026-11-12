@@ -336,6 +336,8 @@ The alternative is tracking "am I still the outermost wrapper" across reloads, w
 
 A runtime assertion that passes proves nothing on its own: it may be looking at the wrong surface, or at a state the bug cannot reach. The dedupe assertion shipped in 0.1.1 was exactly that — it re-typed into the quick switcher, which never calls `open()` twice, so it passed on 0.1.0 as well.
 
+The replacement has the same trap in a different place. The entry that was chosen — the property-name field in a note's properties panel, a real `AbstractInputSuggest` — leaves one row when a full property name is typed, and the host already highlights it. Asserting "the matching row is selected" there is true whether or not auto match runs.
+
 ### Decision
 
 Every runtime assertion that claims to catch a specific historical bug is run once against the build that had the bug. The old sources are exported with `git archive <sha> src` into a scratch directory, built there, and swapped into a throwaway vault. The current working tree is never touched.
@@ -349,7 +351,8 @@ The second half matters as much: "instrumentation says 3" and "the bug is observ
 ### Consequences
 
 - Results live outside the repository (`_internal/<project>/negative-control/`); the public repo does not need a verification log, but the team does.
-- The 0.1.2 check now has both: `one context served all three keystrokes` fails on 0.1.0 (id drift), and `three keystrokes caused three opens` proves the three opens really happened on the current build.
+- Two shapes of assertion came out of this. "Did the mechanism run" is proved by instrumentation (`three keystrokes caused three opens`). "Did it change what the user sees" is proved by an A/B: run the same input twice with the feature on and off, and require different outcomes. The popover auto-match check does the latter, pinning the tie policy to `last` so the two runs cannot coincide on row zero.
+- On 0.1.0 the control fails three assertions, including `contexts: 4, shortcuts: 4, watchers: 4` for a single surface. The counter assertion fails there too, but only because that build has no counter — that is not evidence of the bug and is not quoted as such.
 
 ---
 

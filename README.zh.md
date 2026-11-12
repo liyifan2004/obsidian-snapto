@@ -69,7 +69,7 @@ SnapTo 完全在本机运行。不上传任何内容，没有遥测，不扫描�
 npm install
 npm run dev        # 监听构建
 npm run verify     # 类型检查 + 测试 + lint + 构建
-npm run sync "D:/MyNotes/Test"   # 把构建产物复制进库
+npm run sync "<vault-path>"     # 把构建产物复制进库
 ```
 
 每次提交前跑 `npm run verify`。目录结构与调试流程见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。

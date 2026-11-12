@@ -69,7 +69,7 @@ SnapTo runs entirely on your machine. It sends nothing anywhere, has no telemetr
 npm install
 npm run dev        # watch build
 npm run verify     # typecheck + test + lint + build
-npm run sync "D:/MyNotes/Test"   # copy build output into a vault
+npm run sync "<vault-path>"     # copy build output into a vault
 ```
 
 `npm run verify` is the gate before every commit. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the layout and the debugging workflow.

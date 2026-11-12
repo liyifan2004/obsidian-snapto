@@ -92,7 +92,7 @@ Popout windows are separate documents in the same renderer. Three things follow:
 
 - Element checks are shape-based (`isElementLike`), because `instanceof HTMLElement` compares against the current realm's constructor and is false for a node from another window.
 - `ModifierTracker` keeps one listener set per document and applies the body class to each document's own `body`.
-- Documents are released on `Window.closed`, swept whenever a surface opens. `pagehide` is registered as well, but Electron does not fire it for a popout close — measured, not assumed.
+- Documents are released on `Window.closed` (or a null `defaultView`), swept whenever a surface opens. No DOM event is used: `pagehide` was measured not to fire when Electron closes a popout. The sweep is lazy — a closed window is released on the next surface opened, not at the moment it closes (decision 0016).
 
 ## Lifecycle
 

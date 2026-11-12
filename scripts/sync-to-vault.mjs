@@ -1,7 +1,7 @@
 /**
  * Copy the built plugin into a vault so it can be loaded from Obsidian.
  *
- *   node scripts/sync-to-vault.mjs "D:/MyNotes/Test"
+ *   node scripts/sync-to-vault.mjs "<vault-path>"
  *
  * Only the three files Obsidian reads are copied. `data.json` holds user
  * settings and must never be overwritten from here.

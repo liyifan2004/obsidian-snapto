@@ -70,9 +70,9 @@ Popout support needed four fixes: elements are matched by shape instead of `inst
 
 | Date | Obsidian | Checked |
 | --- | --- | --- |
-| 2026-11-13 | 1.15.1 | Runtime check, 13 assertions, exit 0: quick switcher (scene, `Ctrl+2`, auto match, badges, retypes), command palette, popout, and the property-name field as the popover surface (scene `popover-suggest`, one context after three keystrokes, badges, `Ctrl+2` creating the second property). |
+| 2026-11-13 | 1.15.1 | Runtime check, 18 assertions, exit 0: quick switcher (scene, `Ctrl+2`, auto match, badges, retypes), popover surface via the property-name field (scene, dedupe with a bind count, badges, an A/B on auto match, `Ctrl+2` creating a property). |
 | 2026-11-13 | 1.15.1 | Light theme: contrast and layout measured in the quick switcher. |
-| 2026-11-13 | 1.15.1 | Negative control: rebuilt `src/` at `6944377` and re-ran the same check. Three assertions fail (popover scene, dedupe, badges), exit code 1 — the dedupe assertion does observe the bug it is named after. |
+| 2026-11-13 | 1.15.1 | Negative control against `6944377`: 3 of 18 fail, exit 1 — `three keystrokes caused three opens` (the counter does not exist there), `one context served all three keystrokes` (`popover-suggest-4` → `popover-suggest-6`), and `one context after three keystrokes` (`contexts: 4, shortcuts: 4, watchers: 4`). Scene detection and badges pass on that build; they were never broken. |
 | 2026-11-13 | 1.15.1 | Popout: opening a surface there raises the tracked-document count to 2; closing the window leaves it at 2 until the next surface opens, then 1. |
 | 2026-11-13 | 1.15.1 | Popout window: prompt opens there, badges visible on modifier, `Ctrl+2` opens the expected note, typing a full title selects it, one context throughout. |
 | 2026-11-13 | 1.5.12, 1.13.4 | Bundle read only: internal fields (`chooser`, `scope`, `values`, `setSelectedItem`, `useSelectedItem`) present in both. |
