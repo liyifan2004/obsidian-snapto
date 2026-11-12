@@ -29,6 +29,25 @@ Run `npm run check:public` before pushing. It is also wired to `prepublishOnly`,
 
 Creating a repository, changing its visibility, or pushing it for the first time is a decision for the user, not a default action.
 
+## Release
+
+Push a tag and CI does the rest: `.github/workflows/release.yml` runs `npm ci`, then
+`check:public`, then `verify`, and finally `gh release create --draft` with `main.js`,
+`manifest.json` and `styles.css`.
+
+The release is a **draft**. Publishing it stays a human decision — a tag alone should not
+make a version visible to users.
+
+Two things to be clear about:
+
+- CI runs *after* the push. It stops a release, not a push. The defence against publishing
+  internal material is still that the files are not in the repository.
+- The tag must equal the version in `manifest.json`; Obsidian checks that, and a mismatched
+  tag makes the plugin uninstallable.
+
+`_internal/_tools/release.ps1` still exists for working offline, but CI is the main path.
+Nothing has to be built or uploaded by hand.
+
 ## Testing
 
 `vitest` with `jsdom`. `test/setup/obsidian-dom.ts` adds the small set of Obsidian DOM helpers the code uses (`createEl`, `addClass`, `instanceOf`, …). `test/mocks/obsidian.ts` stubs the module so type-only imports resolve.

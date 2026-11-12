@@ -1,0 +1,43 @@
+name: Release
+
+# A tag creates a draft release with the three files Obsidian needs. Publishing
+# the draft is a human decision; nothing here makes a version visible.
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: npm
+
+      - run: npm ci
+
+      # Runs before the build so a tag carrying internal material produces no
+      # release at all. It cannot stop the push - that already happened - and it
+      # does not need to: the real defence is that internal documents live
+      # outside the repository.
+      - name: Refuse to publish internal material
+        run: npm run check:public
+
+      - run: npm run verify
+
+      - name: Create draft release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          gh release create "$tag" \
+            --title="$tag" \
+            --draft \
+            main.js manifest.json styles.css
