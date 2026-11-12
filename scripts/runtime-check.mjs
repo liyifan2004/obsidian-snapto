@@ -79,6 +79,11 @@ async function evaluate(client, expression) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const checks = [];
+/**
+ * `pass: null` means "not applicable in this run" - it is neither a pass nor a
+ * failure, but it is recorded, so the number of assertions is fixed by the file
+ * rather than by which branches happened to run.
+ */
 const record = (name, pass, detail) => checks.push({ name, pass, detail });
 
 const pages = await listPages();
@@ -110,13 +115,17 @@ async function openSwitcher() {
   return false;
 }
 
-if (!(await openSwitcher())) {
-  record("quick switcher opened", false, "no .prompt-input after 4 attempts");
+const switcherReady = await openSwitcher();
+record(
+  "quick switcher opened",
+  switcherReady,
+  switcherReady ? "prompt rendered" : "no .prompt-input after 10 attempts",
+);
+if (!switcherReady) {
   client.close();
-  console.log(JSON.stringify({ checks, failed: checks.length }, null, 2));
+  console.log(JSON.stringify({ total: checks.length, failed: checks.length, checks }, null, 2));
   process.exit(1);
 }
-record("quick switcher opened", true, "prompt rendered");
 
 await ev(
   `(() => {
@@ -179,10 +188,13 @@ record(
   afterRetouch,
 );
 
+// One record call per logical assertion, whatever the branch does. The number of
+// assertions is then fixed by this file, which is what the docs quote.
+let shortcutResult = { pass: null, detail: "not requested: pass --expect" };
 if (EXPECT) {
   const target = list.candidates.indexOf(EXPECT);
   if (target < 0) {
-    record(`"${EXPECT}" present in results`, false, list.candidates);
+    shortcutResult = { pass: false, detail: { reason: "not in the result list", candidates: list.candidates } };
   } else {
     const opened = await ev(
       `(async () => {
@@ -193,11 +205,13 @@ if (EXPECT) {
          return { active: app.workspace.getActiveFile()?.basename ?? null, closed: !document.querySelector(".prompt") };
        })()`,
     );
-    record("shortcut opened the expected note", opened.active === EXPECT, opened);
+    shortcutResult = { pass: opened.active === EXPECT, detail: opened };
   }
 }
+record("shortcut opened the expected note", shortcutResult.pass, shortcutResult.detail);
 
 // Typing the full title must leave that row selected once the idle delay passed.
+let titleResult = { pass: null, detail: "not requested: pass --expect" };
 if (EXPECT) {
   const autoMatch = await ev(
     `(async () => {
@@ -213,8 +227,9 @@ if (EXPECT) {
        return { selected: selected ? selected.textContent.trim() : null };
      })()`,
   );
-  record("auto match selected the typed title", autoMatch.selected === EXPECT, autoMatch);
+  titleResult = { pass: autoMatch.selected === EXPECT, detail: autoMatch };
 }
+record("auto match selected the typed title", titleResult.pass, titleResult.detail);
 
 // --- A real AbstractInputSuggest: the property-name field opens a PopoverSuggest
 // that calls open() on every keystroke. This is the path that produced one
@@ -363,24 +378,112 @@ if (popoverReady.ok) {
   );
   record("popover badges rendered", popover.badges > 0, `${popover.badges} badges`);
 
-  // Property names are a fixed list, so typing a full one cannot invent a
-  // property; the note is reset above so a previous run's value cannot match.
-  const autoPick = await ev(
+  // A/B on the same input, deliberately using the `last` tie policy.
+  //
+  // The host highlights the first row and never moves it on its own. With auto
+  // match on and ties resolved to the last candidate, the highlight must end up
+  // somewhere else; with it off, the row must stay on the host default. Comparing
+  // "the matching row is selected" would be vacuous — the property list often has
+  // one row, or the typed value itself as row zero.
+  const autoMatchProbe = (enabled) =>
+    ev(
+      `(async () => {
+         const p = app.plugins.plugins["snapto"];
+         const previousEnabled = p.settings.autoMatchEnabled;
+         const previousPolicy = p.settings.conflictPolicy;
+         p.settings.autoMatchEnabled = ${enabled};
+         p.settings.conflictPolicy = "last";
+         const rowsNow = () =>
+           Array.from(document.querySelectorAll(".suggestion-container .suggestion-item")).map((row) =>
+             (row.querySelector(".suggestion-title") || row).textContent.trim(),
+           );
+         const selectedNow = () => {
+           const row = document.querySelector(".suggestion-container .suggestion-item.is-selected");
+           return row ? (row.querySelector(".suggestion-title") || row).textContent.trim() : null;
+         };
+         try {
+           const input = document.querySelector(".metadata-property-key-input");
+           if (!input) return { error: "input gone" };
+           input.focus();
+           input.value = "";
+           input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+           await new Promise((resolve) => setTimeout(resolve, 250));
+           input.value = "a";
+           input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+           await new Promise((resolve) => setTimeout(resolve, 300));
+           const early = selectedNow();
+           const rows = rowsNow();
+           await new Promise((resolve) => setTimeout(resolve, p.settings.delayMs + 700));
+           return {
+             rows,
+             early,
+             late: selectedNow(),
+             hostDefault: rows[0] ?? null,
+             lastRow: rows[rows.length - 1] ?? null,
+           };
+         } finally {
+           // Restored even if anything above throws.
+           p.settings.autoMatchEnabled = previousEnabled;
+           p.settings.conflictPolicy = previousPolicy;
+         }
+       })()`,
+    );
+
+  const withAutoMatch = await autoMatchProbe(true);
+  const withoutAutoMatch = await autoMatchProbe(false);
+
+  record(
+    "auto match moved the highlight in the popover",
+    typeof withAutoMatch.late === "string" &&
+      withAutoMatch.early === withAutoMatch.hostDefault &&
+      withAutoMatch.late === withAutoMatch.lastRow &&
+      withAutoMatch.rows.length > 1,
+    withAutoMatch,
+  );
+  record(
+    "the highlight stays put with auto match off",
+    typeof withoutAutoMatch.late === "string" &&
+      withoutAutoMatch.early === withoutAutoMatch.hostDefault &&
+      withoutAutoMatch.late === withoutAutoMatch.hostDefault &&
+      withoutAutoMatch.late !== withAutoMatch.late,
+    withoutAutoMatch,
+  );
+
+  // Leave the field in a state the Ctrl+2 check can use.
+  await ev(
     `(async () => {
-       const p = app.plugins.plugins["snapto"];
        const input = document.querySelector(".metadata-property-key-input");
-       if (!input) return { selected: null, reason: "input gone" };
-       input.value = "aliases";
+       if (!input) return false;
+       input.value = "a";
        input.dispatchEvent(new InputEvent("input", { bubbles: true }));
-       await new Promise((resolve) => setTimeout(resolve, p.settings.delayMs + 400));
-       const selected = document.querySelector(".suggestion-item.is-selected .suggestion-title");
-       return { selected: selected ? selected.textContent.trim() : null };
+       await new Promise((resolve) => setTimeout(resolve, 400));
+       return true;
      })()`,
   );
-  record("auto match selected the typed property", autoPick.selected === "aliases", autoPick);
 
   // Ctrl+2 must pick the second suggestion, creating that property row.
-  if (popover.candidates.length >= 2) {
+  // The candidate list is read now, not reused from the three-keystroke snapshot:
+  // the A/B block above changed the query since then.
+  const afterAutoMatch = await ev(
+    `(() => {
+       const p = app.plugins.plugins["snapto"];
+       const pick = (p) => {
+         const all = p.contexts.all();
+         for (let i = all.length - 1; i >= 0; i -= 1) {
+           const c = all[i];
+           if (!c.isAlive()) continue;
+           if (p.settings.scenes[c.scene]?.enabled !== true) continue;
+           if (c.getCandidates().length === 0) continue;
+           return c;
+         }
+         return null;
+       };
+       return { candidates: pick(p) ? pick(p).getCandidates().map((c) => c.text) : [] };
+     })()`,
+  );
+
+  let ctrlResult = { pass: false, detail: "not reached" };
+  if (afterAutoMatch.candidates.length >= 2) {
     const picked = await ev(
       `(async () => {
          const p = app.plugins.plugins["snapto"];
@@ -407,12 +510,14 @@ if (popoverReady.ok) {
          return { expected, rows, prevented: evt.defaultPrevented };
        })()`,
     );
-    record(
-      "Ctrl+2 picked the second suggestion",
-      picked.rows.includes(picked.expected),
-      picked,
-    );
+    ctrlResult = { pass: picked.rows.includes(picked.expected), detail: picked };
+  } else {
+    ctrlResult = {
+      pass: false,
+      detail: { reason: "fewer than two candidates after the auto-match probe", candidates: afterAutoMatch.candidates },
+    };
   }
+  record("Ctrl+2 picked the second suggestion", ctrlResult.pass, ctrlResult.detail);
 
   await ev(`(() => {
     const input = document.querySelector(".metadata-property-key-input");
@@ -424,13 +529,27 @@ if (popoverReady.ok) {
 const settings = await ev(
   `(() => {
      const p = app.plugins.plugins["snapto"];
-     return { scenes: Object.keys(p.settings.scenes).length, delay: p.settings.delayMs };
+     return {
+       scenes: Object.keys(p.settings.scenes).length,
+       delay: p.settings.delayMs,
+       policy: p.settings.conflictPolicy,
+       level: p.settings.matchLevel,
+     };
    })()`,
 );
-record("settings loaded", settings.scenes > 0, settings);
+// An assertion that cannot fail is noise; this one pins the values the rest of
+// the run depends on.
+record(
+  "settings match the defaults the checks assume",
+  settings.scenes === 5 && settings.delay >= 200 && settings.delay <= 5000,
+  settings,
+);
 
 client.close();
 
-const failed = checks.filter((check) => !check.pass);
-console.log(JSON.stringify({ checks, failed: failed.length }, null, 2));
+const failed = checks.filter((check) => check.pass === false);
+const notApplicable = checks.filter((check) => check.pass === null).length;
+console.log(
+  JSON.stringify({ total: checks.length, failed: failed.length, notApplicable, checks }, null, 2),
+);
 process.exit(failed.length === 0 ? 0 : 1);
