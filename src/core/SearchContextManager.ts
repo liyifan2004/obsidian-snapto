@@ -4,9 +4,9 @@ import type { SuggestionContext } from "./SuggestionContext";
  * Keeps every live search surface, newest first.
  *
  * Several surfaces can be alive at once: a modal opened on top of a popover,
- * or an editor suggest while a modal is still mounted. "Active" therefore means
- * "most recently touched and still attached to the document", never "the only
- * one".
+ * or an editor suggest while a modal is still mounted. `all()` returns them
+ * newest-last; picking one is the caller's job, because "the one I should act
+ * on" depends on scene settings the registry knows nothing about.
  *
  * There is deliberately no subscription mechanism: the plugin reconciles every
  * context itself when settings change, and a listener registry with no second
@@ -51,17 +51,6 @@ export class SearchContextManager {
       if (id === undefined) continue;
       const context = this.contexts.get(id);
       if (context && context.host === host && context.isAlive()) return context;
-    }
-    return null;
-  }
-
-  /** Most recent live context, or null. */
-  active(): SuggestionContext | null {
-    for (let i = this.order.length - 1; i >= 0; i -= 1) {
-      const id = this.order[i];
-      if (id === undefined) continue;
-      const context = this.contexts.get(id);
-      if (context?.isAlive()) return context;
     }
     return null;
   }

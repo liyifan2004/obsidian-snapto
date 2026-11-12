@@ -168,24 +168,6 @@ describe("ModifierTracker", () => {
     tracker.stop();
   });
 
-  it("detaches on pagehide from that window", () => {
-    const tracker = new ModifierTracker(document, "Mod", () => {});
-    const popout = fakeDocument();
-
-    tracker.start();
-    tracker.attachDocument(popout.doc);
-
-    const pagehide = popout.handlers.get("pagehide");
-    expect(pagehide).toBeDefined();
-
-    pagehide?.({ target: popout.win } as unknown as Event);
-
-    expect(tracker.documentCount()).toBe(1);
-    expect(popout.listeners.has("pagehide")).toBe(false);
-
-    tracker.stop();
-  });
-
   it("drops the class everywhere when the modifier changes", () => {
     const tracker = new ModifierTracker(document, "Mod", () => {});
     tracker.start();

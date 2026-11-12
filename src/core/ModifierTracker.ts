@@ -55,13 +55,6 @@ export class ModifierTracker {
     if (this.down) this.setDown(false);
   };
 
-  /** A closed popout must stop holding a reference and stop receiving classes. */
-  private readonly onPageHide = (evt: Event): void => {
-    const target = evt.target as { document?: Document } | null;
-    const doc = target?.document;
-    if (doc) this.detachDocument(doc);
-  };
-
   constructor(
     private readonly primaryDoc: Document,
     modifier: ModifierKey,
@@ -80,9 +73,10 @@ export class ModifierTracker {
    * wired once, no matter how many surfaces open in it.
    */
   attachDocument(doc: Document): void {
-    // Popout windows do not fire `pagehide` when Electron closes them, so the
-    // reliable signal is `Window.closed`. Sweeping on every attach costs
-    // nothing and cleans up windows that went away while nothing was open.
+    // Electron does not fire `pagehide` when a popout closes (measured), so the
+    // only reliable signal is `Window.closed` / a null `defaultView`. Sweeping
+    // here is lazy: a closed window is released on the next surface opened, not
+    // at the moment it closes. See decision 0016.
     this.sweepClosed();
 
     if (this.docs.has(doc)) return;
@@ -93,9 +87,6 @@ export class ModifierTracker {
     win.addEventListener("keydown", this.onKeyDown, true);
     win.addEventListener("keyup", this.onKeyUp, true);
     win.addEventListener("blur", this.onBlur);
-    // Standard DOM event, no Obsidian API involved. Whether Electron fires it
-    // for a popout is checked in the runtime pass, not assumed here.
-    win.addEventListener("pagehide", this.onPageHide);
     // A surface can open while the modifier is already held.
     if (this.down) doc.body.addClass(MODIFIER_BODY_CLASS);
   }
@@ -117,8 +108,11 @@ export class ModifierTracker {
     win?.removeEventListener("keydown", this.onKeyDown, true);
     win?.removeEventListener("keyup", this.onKeyUp, true);
     win?.removeEventListener("blur", this.onBlur);
-    win?.removeEventListener("pagehide", this.onPageHide);
-    doc.body.removeClass(MODIFIER_BODY_CLASS);
+    // A closing window can have already lost its body; removing a class from
+    // null would throw inside `reconcile`, where the exception is swallowed and
+    // silently skips the rest of that bind.
+    const body = doc.body as HTMLElement | null;
+    body?.removeClass(MODIFIER_BODY_CLASS);
   }
 
   stop(): void {

@@ -69,7 +69,7 @@ function makeBinder() {
     // Every bind goes through here, first attach and reuse alike.
     onBind: (context) => {
       binds(context);
-      shortcuts.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9 });
+      shortcuts.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "popover-suggest" });
     },
     log,
   });
@@ -147,7 +147,7 @@ describe("SurfaceBinder", () => {
     binder.bind(second.host, attachFrom(second, "ctx-b"));
 
     expect(contexts.size()).toBe(1);
-    expect(contexts.active()?.id).toBe("ctx-b");
+    expect(contexts.all()[0]?.id).toBe("ctx-b");
   });
 
   it("keeps a surface whose list is empty", () => {
