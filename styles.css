@@ -1,0 +1,44 @@
+/*
+ * SnapTo styles.
+ *
+ * Only plugin-owned class names are styled. Obsidian's own `.suggestion-item`
+ * belongs to every other suggester in the app, so nothing here targets it:
+ * layout is achieved with `float` (blocks) and flex-item behaviour (`.mod-complex`
+ * rows), both of which place the badge at the end of the row without touching
+ * the host's rules.
+ *
+ * Colours come from Obsidian theme variables so light, dark and community
+ * themes all keep working.
+ */
+
+.snapto-index {
+  float: right;
+  margin-left: 0.6em;
+  align-self: center;
+  min-width: 1.6em;
+  padding: 0 0.3em;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  background-color: transparent;
+  color: var(--text-normal);
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  text-align: center;
+  /* Hidden by default, but still occupying space so rows never shift. */
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+/* Always visible for users who asked for it, or while the modifier is held. */
+.snapto-index.is-always,
+body.snapto-modifier-down .snapto-index {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .snapto-index {
+    transition: none;
+  }
+}
