@@ -3,6 +3,20 @@ import type { ModifierKey } from "../settings/DefaultSettings";
 
 export const MODIFIER_BODY_CLASS = "snapto-modifier-down";
 
+/**
+ * The body of a tracked document, or null once the window is tearing down.
+ *
+ * A closing window drops its body before the tracker hears about it, and a
+ * throw here would propagate out of `reconcile`, be swallowed by `HostPatcher`,
+ * and silently skip the shortcuts, badges and watcher for that bind.
+ */
+function bodyOf(doc: Document): HTMLElement | null {
+  // `doc.body` is typed non-null by lib.dom but is null at runtime once the
+  // window starts tearing down, so widen the type and let callers use `?.`.
+  const body: HTMLElement | null = doc.body;
+  return body;
+}
+
 const NAVIGATION_KEYS = new Set([
   "ArrowUp",
   "ArrowDown",
@@ -87,8 +101,9 @@ export class ModifierTracker {
     win.addEventListener("keydown", this.onKeyDown, true);
     win.addEventListener("keyup", this.onKeyUp, true);
     win.addEventListener("blur", this.onBlur);
-    // A surface can open while the modifier is already held.
-    if (this.down) doc.body.addClass(MODIFIER_BODY_CLASS);
+    // A surface can open while the modifier is already held. The body can be
+    // gone already if the window is tearing down.
+    if (this.down) bodyOf(doc)?.addClass(MODIFIER_BODY_CLASS);
   }
 
   /** Drop every document whose window has been closed. */
@@ -108,16 +123,20 @@ export class ModifierTracker {
     win?.removeEventListener("keydown", this.onKeyDown, true);
     win?.removeEventListener("keyup", this.onKeyUp, true);
     win?.removeEventListener("blur", this.onBlur);
-    // A closing window can have already lost its body; removing a class from
-    // null would throw inside `reconcile`, where the exception is swallowed and
-    // silently skips the rest of that bind.
-    const body = doc.body as HTMLElement | null;
-    body?.removeClass(MODIFIER_BODY_CLASS);
+    bodyOf(doc)?.removeClass(MODIFIER_BODY_CLASS);
   }
 
   stop(): void {
-    this.setDown(false);
-    for (const doc of Array.from(this.docs)) this.detachDocument(doc);
+    // Detach first: every detach clears its own body class, and a body that is
+    // already gone must not stop the remaining windows from being released.
+    for (const doc of Array.from(this.docs)) {
+      try {
+        this.detachDocument(doc);
+      } catch {
+        // Keep releasing the others; a half-dead document is not a reason to
+        // leave listeners in the rest.
+      }
+    }
     this.down = false;
   }
 
@@ -133,6 +152,6 @@ export class ModifierTracker {
 
   private setDown(value: boolean): void {
     this.down = value;
-    for (const doc of this.docs) doc.body.toggleClass(MODIFIER_BODY_CLASS, value);
+    for (const doc of this.docs) bodyOf(doc)?.toggleClass(MODIFIER_BODY_CLASS, value);
   }
 }

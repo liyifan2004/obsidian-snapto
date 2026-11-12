@@ -18,8 +18,6 @@ function fakeDocument() {
     }),
   };
   const doc = { body, defaultView: win } as unknown as Document;
-  // `pagehide` targets the window, and the handler reads the document off it.
-  win.document = doc;
   return { doc, body, win, listeners, handlers };
 }
 
@@ -166,6 +164,53 @@ describe("ModifierTracker", () => {
     expect(popout.listeners.size).toBe(0);
 
     tracker.stop();
+  });
+
+  it("survives a document whose body is already gone", () => {
+    const tracker = new ModifierTracker(document, "Mod", () => {});
+    const dying = fakeDocument();
+    const alive = fakeDocument();
+
+    tracker.start();
+    tracker.attachDocument(dying.doc);
+    tracker.attachDocument(alive.doc);
+
+    // A closing window loses its body before the tracker hears about it.
+    (dying.doc as { body: HTMLElement | null }).body = null;
+
+    expect(() => tracker.stop()).not.toThrow();
+
+    // Every listener must be gone, including the one on the healthy document.
+    expect(tracker.documentCount()).toBe(0);
+    expect(dying.listeners.size).toBe(0);
+    expect(alive.listeners.size).toBe(0);
+  });
+
+  it("survives a missing body when the modifier changes", () => {
+    const tracker = new ModifierTracker(document, "Mod", () => {});
+    const dying = fakeDocument();
+
+    tracker.start();
+    tracker.attachDocument(dying.doc);
+    (dying.doc as { body: HTMLElement | null }).body = null;
+
+    expect(() => tracker.setModifier("Alt")).not.toThrow();
+    expect(() => tracker.stop()).not.toThrow();
+  });
+
+  it("survives a missing body while the key is held", () => {
+    const tracker = new ModifierTracker(document, "Mod", () => {});
+    const dying = fakeDocument();
+
+    tracker.start();
+    window.dispatchEvent(keyDown("Control"));
+
+    // Attaching while the modifier is down writes the class to the new body.
+    (dying.doc as { body: HTMLElement | null }).body = null;
+    expect(() => tracker.attachDocument(dying.doc)).not.toThrow();
+
+    window.dispatchEvent(new KeyboardEvent("keyup", { key: "Control" }));
+    expect(() => tracker.stop()).not.toThrow();
   });
 
   it("drops the class everywhere when the modifier changes", () => {
