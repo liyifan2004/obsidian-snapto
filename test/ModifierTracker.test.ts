@@ -7,6 +7,7 @@ function fakeDocument() {
   const listeners = new Set<string>();
   const handlers = new Map<string, (evt: Event) => void>();
   const win: Record<string, unknown> = {
+    closed: false,
     addEventListener: vi.fn((type: string, handler: (evt: Event) => void) => {
       listeners.add(type);
       handlers.set(type, handler);
@@ -142,6 +143,27 @@ describe("ModifierTracker", () => {
     // The remaining document still works.
     window.dispatchEvent(keyDown("Control"));
     expect(document.body.classList.contains(MODIFIER_BODY_CLASS)).toBe(true);
+
+    tracker.stop();
+  });
+
+  it("sweeps documents whose window has closed", () => {
+    const tracker = new ModifierTracker(document, "Mod", () => {});
+    const popout = fakeDocument();
+    const second = fakeDocument();
+
+    tracker.start();
+    tracker.attachDocument(popout.doc);
+    tracker.attachDocument(second.doc);
+    expect(tracker.documentCount()).toBe(3);
+
+    // Electron never fires pagehide for a closed popout; Window.closed is the
+    // signal that actually arrives.
+    (popout.win as { closed: boolean }).closed = true;
+    tracker.attachDocument(document);
+
+    expect(tracker.documentCount()).toBe(2);
+    expect(popout.listeners.size).toBe(0);
 
     tracker.stop();
   });

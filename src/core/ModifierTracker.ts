@@ -80,9 +80,14 @@ export class ModifierTracker {
    * wired once, no matter how many surfaces open in it.
    */
   attachDocument(doc: Document): void {
+    // Popout windows do not fire `pagehide` when Electron closes them, so the
+    // reliable signal is `Window.closed`. Sweeping on every attach costs
+    // nothing and cleans up windows that went away while nothing was open.
+    this.sweepClosed();
+
     if (this.docs.has(doc)) return;
     const win = doc.defaultView;
-    if (!win) return;
+    if (!win || win.closed) return;
 
     this.docs.add(doc);
     win.addEventListener("keydown", this.onKeyDown, true);
@@ -93,6 +98,16 @@ export class ModifierTracker {
     win.addEventListener("pagehide", this.onPageHide);
     // A surface can open while the modifier is already held.
     if (this.down) doc.body.addClass(MODIFIER_BODY_CLASS);
+  }
+
+  /** Drop every document whose window has been closed. */
+  private sweepClosed(): void {
+    for (const doc of Array.from(this.docs)) {
+      const win = doc.defaultView;
+      // `defaultView` goes null once the renderer tears the document down; a
+      // window that is merely closing reports `closed === true`.
+      if (!win || win.closed) this.detachDocument(doc);
+    }
   }
 
   /** Stop tracking one document, e.g. after its window went away. */
