@@ -152,6 +152,29 @@ describe("SuggestionContext", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it("clicks the row that belongs to the value index, past group headers", () => {
+    const parts = buildList([
+      { title: "Alpha" },
+      { title: "Recent", group: true },
+      { title: "Beta" },
+    ]);
+    parts.list.useSelectedItem = undefined;
+    const context = makeContext(parts);
+
+    const rows = parts.container.querySelectorAll(".suggestion-item");
+    const clicked: string[] = [];
+    rows.forEach((row) => {
+      row.addEventListener("click", () => clicked.push(row.textContent?.trim() ?? ""));
+    });
+
+    // Index 2 is "Beta"; the old code would have clicked the first plain row.
+    context.commit(2);
+
+    expect(clicked).toHaveLength(1);
+    // The row carries its note ("folder/path") too, so match on the title part.
+    expect(clicked[0]).toContain("Beta");
+  });
+
   it("is alive only while attached and non-empty", () => {
     const parts = buildList([{ title: "Alpha" }]);
     const context = makeContext(parts);

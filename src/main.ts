@@ -101,7 +101,19 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
 
   onSettingsChanged(): void {
     this.tracker?.setModifier(this.settings.modifier);
-    for (const context of this.contexts.all()) this.syncContext(context);
+
+    for (const context of this.contexts.all()) {
+      if (this.settings.scenes[context.scene]?.enabled) {
+        this.syncContext(context);
+        this.refreshBadges(context);
+        continue;
+      }
+      // The scene was switched off while its surface is still open: drop
+      // everything we added so it behaves like stock Obsidian right away.
+      this.shortcuts.dispose(context.id);
+      this.autoMatch?.unwatch(context.id);
+      this.badges.clear(context);
+    }
   }
 
   /** Settings → matcher options, the only place they are derived. */

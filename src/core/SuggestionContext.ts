@@ -103,25 +103,39 @@ export class SuggestionContext implements SearchContext {
     return collectRows(this.containerEl);
   }
 
-  getCandidates(): Candidate[] {
+  /**
+   * Pair each selectable value with the row that renders it.
+   *
+   * The host renders one row per value, group headers included. When a third
+   * party inserts extra decoration the counts drift, so as a fallback non-group
+   * rows are paired with non-group values in order.
+   *
+   * Every caller that needs "row for value index" goes through here; keeping one
+   * implementation is what stops read and click paths from disagreeing.
+   */
+  private pairedRows(): Array<{ index: number; row: HTMLElement | undefined }> {
     const values = this.getValues();
     const rows = this.getRows();
-
-    // The host renders one row per value, group headers included. When a third
-    // party inserts extra decoration the counts drift, so fall back to pairing
-    // non-group rows with non-group values in order.
     const oneRowPerValue = rows.length === values.length;
     const plainRows = rows.filter((row) => !row.hasClass("mod-group"));
-    let plainCursor = 0;
 
-    const candidates: Candidate[] = [];
+    const pairs: Array<{ index: number; row: HTMLElement | undefined }> = [];
+    let cursor = 0;
     for (let index = 0; index < values.length; index += 1) {
+      if (isGroupValue(values[index])) continue;
+      const row = oneRowPerValue ? rows[index] : plainRows[cursor];
+      cursor += 1;
+      pairs.push({ index, row });
+    }
+    return pairs;
+  }
+
+  getCandidates(): Candidate[] {
+    const values = this.getValues();
+    const candidates: Candidate[] = [];
+
+    for (const { index, row } of this.pairedRows()) {
       const raw = values[index];
-      if (isGroupValue(raw)) continue;
-
-      const row = oneRowPerValue ? rows[index] : plainRows[plainCursor];
-      plainCursor += 1;
-
       const text = (row ? readRowText(row) : "") || textFromValue(raw);
       if (text.length === 0) continue;
       candidates.push({ index, text, raw });
@@ -152,12 +166,7 @@ export class SuggestionContext implements SearchContext {
 
   /** Fallback used when the host list has no `useSelectedItem` (third-party UI). */
   private clickRow(index: number): boolean {
-    const rows = this.getRows();
-    const selectable: HTMLElement[] = [];
-    for (const row of rows) {
-      if (!row.hasClass("mod-group")) selectable.push(row);
-    }
-    const target = selectable[index];
+    const target = this.pairedRows().find((pair) => pair.index === index)?.row;
     if (!target) return false;
     const Ctor = this.doc.defaultView?.MouseEvent;
     if (!Ctor) return false;
