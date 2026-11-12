@@ -94,6 +94,15 @@ describe("SuggestionContext", () => {
     expect(context.getCandidates()[0]?.text).toBe("FromValue");
   });
 
+  it("unwraps a fuzzy match wrapper when falling back to the value", () => {
+    const parts = buildList([{ title: "Alpha" }]);
+    parts.container.textContent = "";
+    parts.list.values = [{ match: { score: 1 }, item: { path: "x/Alpha.md", basename: "Alpha" } }];
+    const context = makeContext(parts);
+
+    expect(context.getCandidates()[0]?.text).toBe("Alpha");
+  });
+
   it("reads the query from an input element", () => {
     const parts = buildList([{ title: "Alpha" }]);
     const input = createEl("input");

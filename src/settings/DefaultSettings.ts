@@ -49,7 +49,7 @@ export const DEFAULT_SETTINGS: SnapToSettings = {
   autoMatchEnabled: true,
   autoMatchAction: "highlight",
   delayMs: 1000,
-  matchLevel: "prefix",
+  matchLevel: "contains",
   normalizeWidth: true,
   ignoreCase: true,
   ignoreSeparators: true,

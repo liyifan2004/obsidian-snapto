@@ -29,9 +29,10 @@ export const BASE_SCORE: Record<MatchLevel, number> = {
 };
 
 export const DEFAULT_MATCH_OPTIONS: MatchOptions = {
-  // Prefix by default: highlighting `notebook` while `note` is typed is useful,
-  // and auto *confirm* has its own guard (`isConfidentLevel`).
-  minLevel: "prefix",
+  // Contains by default. Chinese titles have no word boundaries, so a title
+  // written `会议纪要 2026` should answer `纪要`. Auto *confirm* has its own
+  // guard (`isConfidentLevel`), so a loose floor never opens the wrong note.
+  minLevel: "contains",
   normalizeWidth: true,
   ignoreCase: true,
   ignoreSeparators: true,

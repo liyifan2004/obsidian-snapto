@@ -19,23 +19,26 @@ export class Platform {
 
 export class Plugin {}
 
-/** Stand-ins for the two classes the plugin wraps. */
-export class SuggestModal {
-  open(): void {
-    // Obsidian creates the prompt DOM here.
-  }
-  close(): void {}
-}
-
-export class PopoverSuggest {
-  open(): void {}
-  close(): void {}
-}
-
+/**
+ * Stand-ins that mirror the real hierarchy: `SuggestModal` and `PopoverSuggest`
+ * do not own `open` themselves, they inherit it — which is exactly why patching
+ * the subclass prototype is safe for every other `Modal` user.
+ */
 export class Modal {
-  open(): void {}
-  close(): void {}
+  openCount = 0;
+  closeCount = 0;
+
+  open(): void {
+    this.openCount += 1;
+  }
+
+  close(): void {
+    this.closeCount += 1;
+  }
 }
+
+export class SuggestModal extends Modal {}
+export class PopoverSuggest extends Modal {}
 export class PluginSettingTab {}
 export class Notice {
   constructor(_message: string) {}

@@ -1,5 +1,5 @@
 import type { Candidate, SceneId, SearchContext } from "../types";
-import { collectRows, readArray, readInputValue, readRowText, readString } from "../utils/dom";
+import { collectRows, readArray, readInputValue, readProp, readRowText, readString } from "../utils/dom";
 
 /**
  * Shape of Obsidian's internal suggestion list (`Suggestions`), shared by
@@ -25,12 +25,14 @@ function isGroupValue(value: unknown): boolean {
 
 /** Best-effort title for a raw suggestion value, used when the row is missing. */
 function textFromValue(value: unknown): string {
-  if (typeof value === "string") return value;
+  // Values are usually wrappers: `{ match, item }` or `{ type, file, ... }`.
+  const source = readProp(value, "item") ?? readProp(value, "file") ?? value;
+  if (typeof source === "string") return source;
   return (
-    readString(value, "basename") ??
-    readString(value, "name") ??
-    readString(value, "title") ??
-    readString(value, "path") ??
+    readString(source, "basename") ??
+    readString(source, "name") ??
+    readString(source, "title") ??
+    readString(source, "path") ??
     ""
   );
 }

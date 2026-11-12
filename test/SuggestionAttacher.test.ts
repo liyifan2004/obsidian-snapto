@@ -37,4 +37,21 @@ describe("detectModalScene", () => {
   it("does not mistake an id-only object for a command", () => {
     expect(detectModalScene([{ id: "x", name: "X" }])).toBe("plugin-modal");
   });
+
+  it("sees through the wrapper FuzzySuggestModal adds", () => {
+    // FuzzySuggestModal pushes `{ match, item }` rather than the item itself.
+    const values = [{ match: { score: 1 }, item: { path: "notes/a.md", basename: "a" } }];
+    expect(detectModalScene(values)).toBe("quick-switcher");
+  });
+
+  it("sees through the quick switcher wrapper", () => {
+    // The switcher pushes `{ type, file, match, downranked }`.
+    const values = [{ type: "file", file: { path: "notes/a.md", basename: "a" }, match: {} }];
+    expect(detectModalScene(values)).toBe("quick-switcher");
+  });
+
+  it("recognises wrapped commands too", () => {
+    const values = [{ match: {}, item: { id: "app:go-back", name: "Back", callback: () => {} } }];
+    expect(detectModalScene(values)).toBe("command-palette");
+  });
 });

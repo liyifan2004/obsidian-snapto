@@ -111,6 +111,7 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   // ------------------------------------------------------------------ wiring
 
   private onSurfaceOpen(attach: () => SuggestionContext | null): void {
+    this.pruneDead();
     try {
       const context = attach();
       if (!context) return;
@@ -125,6 +126,22 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
     } catch (error) {
       // A single unreadable surface must not take down the others.
       this.log("attach failed", error);
+    }
+  }
+
+  /**
+   * Release everything attached to surfaces that already closed.
+   *
+   * Obsidian pops the keymap scope itself, but our own registries (shortcut
+   * count, watchers, badges) would otherwise grow for the whole session.
+   */
+  private pruneDead(): void {
+    for (const context of this.contexts.all()) {
+      if (context.isAlive()) continue;
+      this.shortcuts.dispose(context.id);
+      this.autoMatch?.unwatch(context.id);
+      this.badges.clear(context);
+      this.contexts.remove(context.id);
     }
   }
 

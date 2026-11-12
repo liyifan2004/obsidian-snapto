@@ -2,10 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { HostPatcher } from "../src/core/HostPatcher";
 import { Modal, PopoverSuggest, SuggestModal } from "./mocks/obsidian";
 
-interface Host {
-  open(): void;
-}
-
 function handlers() {
   return { onModalOpen: vi.fn(), onSuggestOpen: vi.fn() };
 }
@@ -54,25 +50,27 @@ describe("HostPatcher", () => {
     patcher = new HostPatcher();
     patcher.install(handlers());
 
-    const spy = vi.spyOn(SuggestModal.prototype, "open");
     const modal = new SuggestModal();
     modal.open();
 
-    // The spy wraps the patched method, so its own call proves the chain ran.
-    expect(spy).toHaveBeenCalledTimes(1);
+    // The base class counts the call, so the wrapper reached it.
+    expect(modal.openCount).toBe(1);
   });
 
-  it("restores the original prototype on uninstall", () => {
-    const original = SuggestModal.prototype.open;
+  it("restores the prototype chain on uninstall", () => {
+    const owns = () => Object.prototype.hasOwnProperty.call(SuggestModal.prototype, "open");
+    expect(owns()).toBe(false);
+
     const callbacks = handlers();
     patcher = new HostPatcher();
     patcher.install(callbacks);
-    expect(SuggestModal.prototype.open).not.toBe(original);
+    expect(owns()).toBe(true);
 
     patcher.uninstall();
     patcher = null;
 
-    expect(SuggestModal.prototype.open).toBe(original);
+    // Own property removed, so the inherited implementation is used again.
+    expect(owns()).toBe(false);
     new SuggestModal().open();
     expect(callbacks.onModalOpen).not.toHaveBeenCalled();
   });

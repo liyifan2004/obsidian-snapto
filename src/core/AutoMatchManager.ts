@@ -126,10 +126,14 @@ export class AutoMatchManager {
 
     const candidate = candidates[winner.index];
     if (!candidate) return false;
-    if (candidate.index === context.getSelectedIndex()) return false;
 
     const confident = isConfidentLevel(winner.level);
     const action = config.action === "confirm" && confident ? "confirm" : "highlight";
+
+    // Already highlighted is only "nothing to do" when we would not confirm.
+    // With confirm enabled, a single hit that is already selected is exactly
+    // the case the user asked for: type the full title, the note opens.
+    if (action === "highlight" && candidate.index === context.getSelectedIndex()) return false;
 
     this.deps.log("matched", {
       query,

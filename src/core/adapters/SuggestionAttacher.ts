@@ -9,6 +9,19 @@ function nextId(prefix: string): string {
   return `${prefix}-${contextSerial}`;
 }
 
+/**
+ * Suggestion values are often wrappers rather than the items themselves:
+ *
+ * - `FuzzySuggestModal` pushes `{ match, item }`
+ * - the quick switcher pushes `{ type, file, match, downranked }`
+ *
+ * Both are unwrapped here so scene detection and text extraction see the file
+ * or command behind the row.
+ */
+export function unwrapSuggestion(value: unknown): unknown {
+  return readProp(value, "item") ?? readProp(value, "file") ?? value;
+}
+
 /** Obsidian's `Command` objects expose id + name and at least one callback. */
 function isCommandLike(value: unknown): boolean {
   if (readString(value, "id") === null || readString(value, "name") === null) return false;
@@ -36,8 +49,9 @@ function isFileLike(value: unknown): boolean {
 export function detectModalScene(values: readonly unknown[]): SceneId {
   const sample = values.find((value) => readString(value, "type") !== "group");
   if (sample === undefined) return "plugin-modal";
-  if (isCommandLike(sample)) return "command-palette";
-  if (isFileLike(sample)) return "quick-switcher";
+  const item = unwrapSuggestion(sample);
+  if (isCommandLike(item)) return "command-palette";
+  if (isFileLike(item)) return "quick-switcher";
   return "plugin-modal";
 }
 
