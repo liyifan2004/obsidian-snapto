@@ -55,9 +55,16 @@ export function collectRows(containerEl: HTMLElement): HTMLElement[] {
   return Array.from(containerEl.querySelectorAll<HTMLElement>(":scope > .suggestion-item"));
 }
 
-/** Text input value, tolerating contenteditable hosts. */
+/**
+ * Text input value, tolerating contenteditable hosts.
+ *
+ * Reads `.value` by shape rather than by constructor: an `<input>` from a
+ * popout window is not `instanceof HTMLInputElement` in this realm, and testing
+ * that way silently returned an empty query there.
+ */
 export function readInputValue(el: HTMLElement | null): string {
   if (!el) return "";
-  if (el.instanceOf(HTMLInputElement) || el.instanceOf(HTMLTextAreaElement)) return el.value;
+  const candidate = el as unknown as { value?: unknown };
+  if (typeof candidate.value === "string") return candidate.value;
   return el.textContent ?? "";
 }

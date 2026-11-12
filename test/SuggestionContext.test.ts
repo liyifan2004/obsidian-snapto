@@ -113,6 +113,15 @@ describe("SuggestionContext", () => {
     expect(context.getQuery()).toBe("alpha");
   });
 
+  it("reads the query from a foreign input element", () => {
+    const parts = buildList([{ title: "Alpha" }]);
+    // An input from a popout window fails instanceof in this realm.
+    const foreign = { value: "beta", textContent: null } as unknown as HTMLInputElement;
+    const context = makeContext(parts, foreign);
+
+    expect(context.getQuery()).toBe("beta");
+  });
+
   it("returns an empty query when there is no input", () => {
     const parts = buildList([{ title: "Alpha" }]);
     expect(makeContext(parts).getQuery()).toBe("");
