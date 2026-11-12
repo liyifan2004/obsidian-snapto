@@ -26,13 +26,14 @@ Nothing here is internal; these are safe.
 | `Setting.setHeading()` | 0.9.16 | Section titles without hand-written `h2` |
 | `Scope.register()` | 0.9.x | Binding number keys to a surface |
 | `SuggestModal`, `PopoverSuggest`, `Modal` | 0.9.x | The two classes that are wrapped |
-| `HTMLElement.instanceOf()` | 0.15.0 | Cross-window type checks in popouts |
 | `createEl` / `createSpan` / `createDiv` | 0.15.0 | DOM construction |
 | `Platform.isMacOS` | 0.9.x | Modifier mapping |
 | `moment.locale()` | bundled | Interface language |
 | `activeDocument` | 0.15.0 | Current window's document |
 
 `getLanguage()` (1.8.7+) is deliberately not used: `moment.locale()` covers the same need without raising `minAppVersion`.
+
+`HTMLElement.instanceOf()` is not used either. It compares against the constructor of the current window, so a node created by a popout reports false — measured on 1.15.1, not assumed. Element checks go through `isElementLike` (shape: `nodeType === 1` plus `querySelectorAll`) instead.
 
 ## Internal fields in use
 
@@ -80,7 +81,7 @@ SnapTo does **not** style `.suggestion-item` or any other core class. Badges are
 
 **`setSelectedItem` wraps.** `setSelectedItem(-1)` jumps to the last row and `setSelectedItem(length)` jumps to the first. Nothing in SnapTo relies on this, but it explains why an off-by-one never throws — it silently lands somewhere plausible. Tests assert the exact index for that reason.
 
-**`instanceOf` is per realm.** Obsidian adds `HTMLElement.prototype.instanceOf`, which compares against the constructor of the current window. A node from a popout window fails it. SnapTo therefore matches elements by shape (`nodeType === 1` plus `querySelectorAll`) in `isElementLike`, and only calls `instanceOf` on values that are already known to come from the right document.
+**`instanceOf` is per realm.** Obsidian adds `HTMLElement.prototype.instanceOf`, which compares against the constructor of the current window, so a node from a popout reports false. SnapTo makes no realm comparison at all: elements are matched by shape in `isElementLike`, and input values are read by their `.value` shape.
 
 ## Failure modes
 

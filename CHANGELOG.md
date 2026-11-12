@@ -2,6 +2,24 @@
 
 All notable changes are recorded here. The format follows Keep a Changelog; versions follow SemVer.
 
+## [0.1.2] - 2026-11-13
+
+Turning a scene off now stays off.
+
+### Fixed
+
+- A disabled scene no longer comes back on the next keystroke. State is derived by one idempotent `reconcile` that every path calls, instead of three branches that each remembered part of the rule.
+- Re-enabling a scene after disabling it restores auto match as well as shortcuts and badges; the watcher used to stay gone until the surface was reopened.
+- `select-result-N` and `match-now` ignore surfaces whose scene is disabled, and so does the arrow-key back-off.
+- An empty result set no longer counts as a closed surface. It used to drop the watcher and give the context a new id when results came back.
+- Modifier listeners for a closed popout are released. Electron does not fire `pagehide` there, so `Window.closed` is swept whenever a surface opens.
+- Settings changed by another device are picked up without a reload (`onExternalSettingsChange`).
+
+### Changed
+
+- `SearchContextManager` lost an unused listener registry and `types` lost the unused `SearchAdapter`.
+- The runtime check now exercises a real `AbstractInputSuggest` (the property-name field) for dedupe, instead of the quick switcher, where the assertion could not fail.
+
 ## [0.1.1] - 2026-11-13
 
 Lifecycle and window fixes. No new settings, no behaviour change for the quick switcher.

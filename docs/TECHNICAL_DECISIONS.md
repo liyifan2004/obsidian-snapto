@@ -278,3 +278,50 @@ Keep it out of 0.1.x. Treat it as the first candidate for 0.2 only if a *navigat
 
 - 0.2 starts with a design note, not an adapter. If the design says "selection", the answer is no and the reason is written down here.
 - Until then, the README says what works instead of implying completeness.
+
+---
+
+## 0013. One reconcile instead of three branches
+
+**Date:** 2026-11-13 · **Status:** accepted
+
+### Context
+
+0.1.1 shipped three places that each maintained part of a surface's state: `onAttach` (shortcuts + watcher + badges), `onReuse` (shortcuts + badges), `onSettingsChanged` (either sync, or dispose + unwatch + clear). Turning a scene off worked until the next keystroke, when the reuse branch re-registered everything from `quickSelectEnabled` alone. Turning it back on never rebuilt the watcher, because nothing on the settings path called `watch`.
+
+### Decision
+
+One `reconcile(context)` derives all three states from current settings and is the only writer. Every path calls it: first attach, repeat open, settings change, external sync. Scene membership is decided inside `syncContext` and `refreshBadges`, not at the call sites.
+
+### Rationale
+
+The three-branch version was not wrong in any single branch; it was wrong in the space between them. Any fix that adds a fourth branch ("remember to re-watch") reproduces the same failure with a different trigger. Making each effect idempotent and re-deriving from settings removes the class of bug rather than one instance.
+
+### Consequences
+
+- A disabled scene keeps a live context and a live observer that does nothing. Accepted: the alternative (removing the context) makes the surface unrevivable until reopened, and a modal does not reopen on its own.
+- `SurfaceBinder` lost its scene knowledge entirely and became "one context per host instance, nothing else". `isSceneEnabled` has exactly one definition, in `main.ts`.
+- The cost is visible: 10 orchestration tests exist because this logic has no other place to be verified.
+
+---
+
+## 0014. HostPatcher leaves an inert layer after a reload
+
+**Date:** 2026-11-13 · **Status:** accepted
+
+### Context
+
+When another plugin wraps `SuggestModal.prototype.open` after us, unloading must not delete their layer. The chosen fix keeps our wrapper in the chain with a "not active" flag, which means each plugin reload can leave one extra pass-through function behind.
+
+### Decision
+
+Leave it. Do not add detection or cleanup for a no-op frame.
+
+### Rationale
+
+The alternative is tracking "am I still the outermost wrapper" across reloads, which needs a registry of wrappers and a way to tell ours from theirs — machinery whose failure mode is deleting someone else's code, the very bug 0.1.1 fixed. A function that calls through and returns is the cheapest possible residue.
+
+### Consequences
+
+- After several reloads in a session, a keystroke may pass through two or three inert frames. Measured cost: a function call.
+- Anyone reading the prototype chain later should know this is deliberate; hence this record.

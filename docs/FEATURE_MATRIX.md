@@ -25,7 +25,8 @@ SnapTo lives at **C** for list reading and at **B** for the click fallback. That
 | Internal link suggest | `EditorSuggest` | not exposed (editor text) | `suggestions.values` + rows | `suggestions.selectedItem` | same | same | C | Runtime: typing `[[` then `Ctrl+2` inserts `[[会议纪要]]`; three further keystrokes keep one context |
 | Tag suggest | `EditorSuggest` → `PopoverSuggest` | not exposed | same | same | same | same | C | Same adapter as links; not exercised in a tag popup |
 | Property / frontmatter suggest | `EditorSuggest` or `PopoverSuggest` | depends on host | same | same | same | same | C | Same adapter; not exercised |
-| Input-attached suggests | `AbstractInputSuggest` → `PopoverSuggest` | `textInputEl.value` | same | same | same | same | C | Implemented; no third-party surface exercised |
+| Property-name field (properties panel) | `AbstractInputSuggest` → `PopoverSuggest` | `textInputEl.value` | `suggestions.values` (`{type,text,widget,score,matches}`) + rows | `suggestions.selectedItem` | same | same | C | Runtime: `Ctrl+2` creates the second suggested property; three keystrokes keep one context |
+| Other input-attached suggests | `AbstractInputSuggest` → `PopoverSuggest` | `textInputEl.value` | same | same | same | same | C | Same adapter as the property field; no third-party surface exercised |
 
 ### What the link list actually contains
 
@@ -36,11 +37,13 @@ Values are `{ type, file, path, score, matches }` with `type: "file"`. The adapt
 | Environment | State |
 | --- | --- |
 | Main window | Supported, verified |
-| Popout window | Supported, verified: badges appear while the modifier is held, `Ctrl+2` opens the expected note, and typing a full title selects that row |
+| Popout window | Supported, verified: badges appear while the modifier is held, `Ctrl+2` opens the expected note, typing a full title selects that row, and one context is kept throughout |
+| Light theme | Verified: badge text `rgb(34,34,34)` on `#ffffff` measures 15.91:1, 19×19 px, 12 px from the row's right edge, no overflow onto the title |
+| Dark theme | Verified in every earlier run |
 | Mobile | Not supported. `isDesktopOnly: true`: the feature is a modifier plus a digit, and there is no touch equivalent |
-| Light theme | Not verified. Badges use theme variables only, but no light-theme pass was run |
+| Settings window | Out of scope. It is a separate renderer with no `app` object, so surfaces there are not patched at all |
 
-Popout support needed three fixes: elements are matched by shape instead of `instanceof` (a popout node fails it), the modifier tracker keeps one listener per document, and the input value is read by shape.
+Popout support needed four fixes: elements are matched by shape instead of `instanceof` (a popout node fails it), the modifier tracker keeps one listener per document, the input value is read by shape, and closed documents are released on `Window.closed`. Electron does not fire `pagehide` for a popout close — measured: the tracked count stayed at 2 after `window.close()`, then dropped to 1 on the next surface opened.
 
 ## Not supported
 
@@ -67,8 +70,11 @@ Popout support needed three fixes: elements are matched by shape instead of `ins
 
 | Date | Obsidian | Checked |
 | --- | --- | --- |
-| 2026-11-13 | 1.15.1 | Quick switcher: scene detection, `Ctrl+2` opens the expected note, auto match moves (`last`) and holds (`unique`), confirm on exact only, badges while the modifier is held, per-scene switch disabling cleanly, one context after three re-types. Command palette: scene and badges. Link suggest: `Ctrl+2` inserts `[[会议纪要]]`, one context after three keystrokes. Settings page: 23 rows, Chinese copy. |
+| 2026-11-13 | 1.15.1 | Runtime check, 13 assertions, exit 0: quick switcher (scene, `Ctrl+2`, auto match, badges, retypes), command palette, popout, and the property-name field as the popover surface (scene `popover-suggest`, one context after three keystrokes, badges, `Ctrl+2` creating the second property). |
+| 2026-11-13 | 1.15.1 | Light theme: contrast and layout measured in the quick switcher. |
+| 2026-11-13 | 1.15.1 | Negative control: rebuilt `src/` at `6944377` and re-ran the same check. Three assertions fail (popover scene, dedupe, badges), exit code 1 — the dedupe assertion does observe the bug it is named after. |
+| 2026-11-13 | 1.15.1 | Popout: opening a surface there raises the tracked-document count to 2; closing the window leaves it at 2 until the next surface opens, then 1. |
 | 2026-11-13 | 1.15.1 | Popout window: prompt opens there, badges visible on modifier, `Ctrl+2` opens the expected note, typing a full title selects it, one context throughout. |
 | 2026-11-13 | 1.5.12, 1.13.4 | Bundle read only: internal fields (`chooser`, `scope`, `values`, `setSelectedItem`, `useSelectedItem`) present in both. |
 
-Not exercised at runtime: input-attached popovers from third-party plugins, tag and property popups, light theme, multi-monitor, mobile (excluded by manifest).
+Not exercised at runtime: input-attached popovers from third-party plugins, tag popups, the property *value* editor (only the property *name* field was used), multi-monitor, mobile (excluded by manifest).

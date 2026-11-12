@@ -1,10 +1,18 @@
 # Roadmap
 
+## Done (0.1.2)
+
+- Turning a scene off now stays off: state converges through one idempotent reconcile instead of three branches.
+- Commands, `match-now` and the arrow-key tracker ignore disabled scenes.
+- An empty result set no longer counts as a closed surface.
+- Modifier listeners for closed popouts are released.
+- Settings synced from another device are picked up without a reload.
+
 ## Done (0.1.1)
 
 - One context per host instance; unloading no longer removes a wrapper installed after ours.
 - Popout windows: badges, shortcuts and auto match all work there.
-- Scene toggles apply to already-open surfaces.
+- Scene toggles applied only until the next keystroke (fixed in 0.1.2).
 - Click fallback aligned with the read path.
 
 ## Done (0.1.0)
@@ -26,7 +34,7 @@
 
 ## Later
 
-- **Global search panel.** Needs its own adapter and a decision about what "select" means without a selection model. See [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md) 0008.
+- **Global search panel.** Needs its own adapter and a decision about what "select" means without a selection model. See [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md) 0012.
 - **More than nine results.** Would need a two-key scheme (e.g. `Mod+g` then digit); no design yet.
 - **Fuzzy ranking parity with the host.** Our fuzzy score is a simple subsequence heuristic; matching the host's ordering exactly would require reimplementing it, which is the kind of coupling worth avoiding.
 

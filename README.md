@@ -11,9 +11,9 @@ Working today, verified in the app:
 - the quick switcher
 - the command palette
 - `[[` link completion in the editor
-- suggestion dialogs opened by other plugins
+- the property-name field in a note's properties panel
 
-Tag and property popups use the same code path as link completion but have not been exercised. Global search, in-note find and the outline are not supported; the reasons are in [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
+Suggestion dialogs opened by other plugins go through the same code path, but none has been exercised. Tag popups share the editor-suggest path and were not exercised either. Global search, in-note find and the outline are not supported; the reasons are in [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
 
 ## What it does
 

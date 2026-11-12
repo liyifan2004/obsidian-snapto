@@ -37,7 +37,9 @@ npm run sync "<vault path>"
 
 What is **not** covered by unit tests: real keymap dispatch, real DOM rendering, the settings page, popout windows, mobile touch (mobile is out of scope).
 
-Two of the bugs fixed in 0.1.1 were invisible to unit tests and to a single manual click: duplicate contexts per keystroke, and a click fallback that only misbehaved when a list had group headers. Both now have a regression test plus a runtime assertion.
+`test/main.test.ts` is the exception to "one module per file": it imports the real `SnapToPlugin` and drives `onload()`, so the state machine in `main.ts` — which had no coverage at all in 0.1.1 — is exercised. Mock `Plugin` round-trips data through `structuredClone`, because Obsidian reads settings back from disk and a shared object hides exactly the bugs this file is for.
+
+Three bugs fixed in 0.1.1/0.1.2 were invisible to unit tests: duplicate contexts per keystroke, a click fallback that misbehaved only with group headers, and a disabled scene coming back on the next keystroke. The first and third now have orchestration tests; the first also has a runtime assertion that was verified to fail against the 0.1.0 build.
 
 ## Verifying against a real Obsidian
 
