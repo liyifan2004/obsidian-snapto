@@ -24,9 +24,23 @@ export interface SurfaceBinderDeps {
  * Whether the scene is enabled is decided there, in one place, not here.
  */
 export class SurfaceBinder {
+  private binds = 0;
+
   constructor(private readonly deps: SurfaceBinderDeps) {}
 
+  /**
+   * How many times a surface was reported open.
+   *
+   * Exposed because "one context" alone cannot prove the dedupe path ran: if the
+   * host rebuilt its container each keystroke, pruning would also keep the count
+   * at one. The runtime check asserts both.
+   */
+  count(): number {
+    return this.binds;
+  }
+
   bind(host: unknown, attach: () => SuggestionContext | null): SuggestionContext | null {
+    this.binds += 1;
     this.deps.prune();
 
     const existing = this.deps.contexts.findByHost(host);

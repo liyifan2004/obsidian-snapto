@@ -98,9 +98,13 @@ record("plugin loaded and prototypes wrapped", Boolean(wiring?.patched), wiring)
 
 /** Execute the command and wait for the prompt to exist; tolerate a slow start. */
 async function openSwitcher() {
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    await ev(`(() => { app.commands.executeCommandById("switcher:open"); return true; })()`);
-    await sleep(400);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    // A cold start spends a while indexing before commands can run.
+    const ready = await ev(`typeof app !== "undefined" && !!app.commands && !!app.workspace`);
+    if (ready) {
+      await ev(`(() => { app.commands.executeCommandById("switcher:open"); return true; })()`);
+    }
+    await sleep(500);
     if (await ev(`!!document.querySelector(".prompt-input")`)) return true;
   }
   return false;
@@ -127,7 +131,19 @@ await sleep(450);
 const list = await ev(
   `(() => {
      const p = app.plugins.plugins["snapto"];
-     const context = p.contexts.active();
+     // Same filter production uses; contexts.active() no longer exists.
+     const pick = (p) => {
+       const all = p.contexts.all();
+       for (let i = all.length - 1; i >= 0; i -= 1) {
+         const c = all[i];
+         if (!c.isAlive()) continue;
+         if (p.settings.scenes[c.scene]?.enabled !== true) continue;
+         if (c.getCandidates().length === 0) continue;
+         return c;
+       }
+       return null;
+     };
+     const context = pick(p);
      return {
        scene: context ? context.scene : null,
        rows: document.querySelectorAll(".prompt-results > .suggestion-item").length,
@@ -246,7 +262,29 @@ if (popoverReady.ok) {
   // focus, so the value is set and an `input` event dispatched instead. That is
   // the same event the field fires per character, which is what drives
   // `AbstractInputSuggest.onInputChange -> showSuggestions -> open()`.
+  const snapshot = `(() => {
+         const p = app.plugins.plugins["snapto"];
+         const pick = (p) => {
+           const all = p.contexts.all();
+           for (let i = all.length - 1; i >= 0; i -= 1) {
+             const c = all[i];
+             if (!c.isAlive()) continue;
+             if (p.settings.scenes[c.scene]?.enabled !== true) continue;
+             if (c.getCandidates().length === 0) continue;
+             return c;
+           }
+           return null;
+         };
+         const context = pick(p);
+         // Older builds have no counter; report null so the assertion can say
+         // it cannot be evaluated instead of crashing the whole run.
+         const binds = p.binder && typeof p.binder.count === "function" ? p.binder.count() : null;
+         return { binds, id: context ? context.id : null };
+       })()`;
+
+  const bindBefore = await ev(snapshot);
   const typed = [];
+  let firstId = null;
   for (const text of ["a", "l", "i"]) {
     const step = await ev(
       `(() => {
@@ -259,17 +297,48 @@ if (popoverReady.ok) {
        })()`,
     );
     await sleep(350);
+    const state = await ev(snapshot);
+    if (firstId === null) firstId = state.id;
     typed.push({
       text,
       ...step,
       container: await ev(`!!document.querySelector(".suggestion-container")`),
+      binds: state.binds,
+      id: state.id,
     });
   }
+  const bindAfter = await ev(snapshot);
+
+  // "One context" alone cannot prove the dedupe path ran: pruning also keeps
+  // the count at one. The bind counter proves each keystroke really reopened.
+  record(
+    "three keystrokes caused three opens",
+    typeof bindBefore.binds === "number" &&
+      typeof bindAfter.binds === "number" &&
+      bindAfter.binds - bindBefore.binds === 3,
+    { before: bindBefore.binds, after: bindAfter.binds },
+  );
+  record(
+    "one context served all three keystrokes",
+    firstId !== null && bindAfter.id === firstId,
+    { firstId, lastId: bindAfter.id },
+  );
 
   const popover = await ev(
     `(() => {
        const p = app.plugins.plugins["snapto"];
-       const context = p.contexts.active();
+       const pick = (p) => {
+       const all = p.contexts.all();
+       for (let i = all.length - 1; i >= 0; i -= 1) {
+         const c = all[i];
+         if (!c.isAlive()) continue;
+         if (p.settings.scenes[c.scene]?.enabled !== true) continue;
+         if (c.getCandidates().length === 0) continue;
+         return c;
+       }
+       return null;
+     };
+       const context = pick(p);
        const container = document.querySelector(".suggestion-container");
        return {
          hasContainer: !!container,
@@ -294,12 +363,39 @@ if (popoverReady.ok) {
   );
   record("popover badges rendered", popover.badges > 0, `${popover.badges} badges`);
 
+  // Property names are a fixed list, so typing a full one cannot invent a
+  // property; the note is reset above so a previous run's value cannot match.
+  const autoPick = await ev(
+    `(async () => {
+       const p = app.plugins.plugins["snapto"];
+       const input = document.querySelector(".metadata-property-key-input");
+       if (!input) return { selected: null, reason: "input gone" };
+       input.value = "aliases";
+       input.dispatchEvent(new InputEvent("input", { bubbles: true }));
+       await new Promise((resolve) => setTimeout(resolve, p.settings.delayMs + 400));
+       const selected = document.querySelector(".suggestion-item.is-selected .suggestion-title");
+       return { selected: selected ? selected.textContent.trim() : null };
+     })()`,
+  );
+  record("auto match selected the typed property", autoPick.selected === "aliases", autoPick);
+
   // Ctrl+2 must pick the second suggestion, creating that property row.
   if (popover.candidates.length >= 2) {
     const picked = await ev(
       `(async () => {
          const p = app.plugins.plugins["snapto"];
-         const expected = p.contexts.active()?.getCandidates()[1]?.text ?? null;
+         const pick = (p) => {
+       const all = p.contexts.all();
+       for (let i = all.length - 1; i >= 0; i -= 1) {
+         const c = all[i];
+         if (!c.isAlive()) continue;
+         if (p.settings.scenes[c.scene]?.enabled !== true) continue;
+         if (c.getCandidates().length === 0) continue;
+         return c;
+       }
+       return null;
+     };
+         const expected = pick(p)?.getCandidates()[1]?.text ?? null;
          const evt = new KeyboardEvent("keydown", {
            key: "2", code: "Digit2", ctrlKey: true, bubbles: true, cancelable: true,
          });
