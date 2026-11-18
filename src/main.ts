@@ -165,10 +165,23 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
     }
   }
 
+  /**
+   * Whether the number shortcuts are available on this surface.
+   *
+   * The badge numbers and the number keys are one feature, so they answer the
+   * same question. They used to answer different ones — the shortcut toggle
+   * had no say over the badges — which meant turning "Enable number
+   * shortcuts" off left the digits on screen, pointing at keys that no
+   * longer did anything.
+   */
+  private shortcutsEnabled(context: SuggestionContext): boolean {
+    return this.settings.quickSelectEnabled && this.isSceneEnabled(context);
+  }
+
   private syncContext(context: SuggestionContext): void {
     this.shortcuts.sync(context, {
       // A disabled scene must lose its keys even while quick select stays on.
-      enabled: this.settings.quickSelectEnabled && this.isSceneEnabled(context),
+      enabled: this.shortcutsEnabled(context),
       modifier: this.settings.modifier,
       maxIndex: MAX_SHORTCUTS,
       scene: context.scene,
@@ -176,7 +189,7 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   }
 
   private refreshBadges(context: SuggestionContext): void {
-    if (this.settings.showBadges && this.isSceneEnabled(context)) {
+    if (this.settings.showBadges && this.shortcutsEnabled(context)) {
       this.badges.apply(context, this.settings.badgeStyle === "always");
     } else {
       this.badges.clear(context);
@@ -261,11 +274,29 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
           if (index >= candidates.length) return false;
           if (checking) return true;
           const target = candidates[index];
-          if (target) active.commit(target.index);
+          // The command carries no key event of its own, so the host's last
+          // event is the closest thing to the modifier the user is holding.
+          if (target) active.commit(target.index, this.lastUserEvent());
           return true;
         },
       });
     }
+  }
+
+  /**
+   * The last event Obsidian saw, when it is a keyboard event.
+   *
+   * `app.lastEvent` is how the host itself remembers modifiers for actions
+   * that were not triggered by a key press. The check is by shape rather than
+   * `instanceof`, because an event from a popout window belongs to another
+   * realm and would fail that test.
+   */
+  private lastUserEvent(): Event | undefined {
+    const last = (this.app as unknown as { lastEvent?: unknown }).lastEvent;
+    if (!last || typeof last !== "object") return undefined;
+    const type = (last as { type?: unknown }).type;
+    if (type !== "keydown" && type !== "keyup") return undefined;
+    return last as Event;
   }
 
   private log(message: string, ...rest: unknown[]): void {

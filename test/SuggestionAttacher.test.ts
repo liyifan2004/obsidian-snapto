@@ -23,8 +23,16 @@ describe("detectModalScene", () => {
     expect(detectModalScene([{ label: "whatever" }])).toBe("plugin-modal");
   });
 
-  it("handles an empty list", () => {
-    expect(detectModalScene([])).toBe("plugin-modal");
+  it("says it cannot tell when the list carries no sample", () => {
+    // Guessing here is what made a disabled scene come back to life: the
+    // quick switcher went empty and was filed under a different scene, whose
+    // toggle then decided whether the shortcuts ran.
+    expect(detectModalScene([])).toBeNull();
+  });
+
+  it("says it cannot tell for the create-new-file placeholder", () => {
+    // Obsidian's placeholder has a null value; it is an action, not a result.
+    expect(detectModalScene([null])).toBeNull();
   });
 
   it("ignores group headers when sampling", () => {
@@ -33,6 +41,10 @@ describe("detectModalScene", () => {
       { path: "notes/a.md", basename: "a" },
     ];
     expect(detectModalScene(values)).toBe("quick-switcher");
+  });
+
+  it("ignores a group-only list", () => {
+    expect(detectModalScene([{ type: "group", title: "Files" }])).toBeNull();
   });
 
   it("does not mistake an id-only object for a command", () => {

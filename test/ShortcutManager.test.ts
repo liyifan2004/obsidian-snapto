@@ -83,7 +83,22 @@ describe("ShortcutManager", () => {
     manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
 
     scope.handlers[2]?.run(keyEvent());
-    expect(commit).toHaveBeenCalledWith(3);
+    expect(commit).toHaveBeenCalledWith(3, expect.anything());
+  });
+
+  it("hands the key event to the commit so the modifier survives", () => {
+    const scope = fakeScope();
+    const { context, commit } = fakeContext(candidates);
+    (context as unknown as { scope: unknown }).scope = scope;
+
+    const manager = new ShortcutManager();
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
+
+    const event = keyEvent();
+    scope.handlers[2]?.run(event);
+
+    // Obsidian decides "new tab" vs "replace" from the event's modifier flags.
+    expect(commit).toHaveBeenCalledWith(3, event);
   });
 
   it("falls through when the number exceeds the list", () => {

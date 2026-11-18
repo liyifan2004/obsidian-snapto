@@ -1,4 +1,4 @@
-import type { SuggestionContext } from "./SuggestionContext";
+import { isCreatePlaceholderRow, type SuggestionContext } from "./SuggestionContext";
 
 export const BADGE_CLASS = "snapto-index";
 export const BADGE_ALWAYS_CLASS = "is-always";
@@ -42,10 +42,19 @@ export class BadgeRenderer {
     }
   }
 
+  /**
+   * Rows that can actually be picked.
+   *
+   * Group headers and the "press Enter to create" placeholder are rendered as
+   * rows but are not results. Numbering them would promise a shortcut that
+   * does not do what the row says it does.
+   */
   private selectableRows(context: SuggestionContext): HTMLElement[] {
     const rows: HTMLElement[] = [];
     for (const row of context.getRows()) {
-      if (!row.hasClass("mod-group") && !row.hasClass("suggestion-empty")) rows.push(row);
+      if (row.hasClass("mod-group") || row.hasClass("suggestion-empty")) continue;
+      if (isCreatePlaceholderRow(row)) continue;
+      rows.push(row);
     }
     return rows;
   }

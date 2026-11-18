@@ -47,6 +47,20 @@ Obsidian calls SuggestModal.open()
 
 `SearchContextManager` keeps *every* live context, newest last, and does no filtering: which one to act on depends on scene settings it knows nothing about. `main.activeEnabledContext()` walks that list newest-first and picks the first context that is alive, belongs to an enabled scene, and currently has results — a surface showing "no results" cannot answer a command and must not shadow a usable one below it.
 
+### Scene is a property of the surface, not of its contents
+
+Detection reads the shape of the first value in the list. An empty list carries no sample, so it cannot be classified — the detector answers "I do not know" and the context keeps the last scene it was able to confirm.
+
+This matters more than it looks. The scene decides which toggle governs the surface. When an empty list was filed under the generic plugin modal instead, the *wrong* toggle decided whether the shortcuts ran, and a disabled scene switched itself back on. See decision 0018.
+
+### A row that cannot be picked is not a result
+
+Obsidian renders a "press Enter to create <query>" row when nothing matches. It is a real row in the DOM but its value is `null`: it is an action, not a result. Values that are `null` are excluded from the candidate list, and the badge renderer skips the row as well. See decision 0017.
+
+### The key event travels with the choice
+
+`commit(index, source)` passes the originating key event to the host, which reads the modifier flags off it to decide between replacing the current leaf and opening a new tab. See decision 0020.
+
 ### Typing
 
 ```
@@ -68,12 +82,14 @@ Watching the list instead of the input is what makes surfaces without an `inputE
 ```
 window keydown (capture) → Obsidian Keymap → top scope
   → our handler on the modal's own scope
-      context.commit(candidate.index)
-          → list.setSelectedItem(index, event)
-          → list.useSelectedItem(event)      → host's selectSuggestion()
+      context.commit(candidate.index, evt)
+          → list.setSelectedItem(index, evt)
+          → list.useSelectedItem(evt)      → host's selectSuggestion()
 ```
 
 No global listener. If the number exceeds the list, the handler returns `undefined`, the key falls through, and any native binding still works.
+
+The key event is handed to the host rather than replaced by a synthetic one. The host asks the event whether a modifier was held — that is how it decides between replacing the current leaf and opening a new tab — so the flags have to survive the trip.
 
 ## Scene state converges in one place
 

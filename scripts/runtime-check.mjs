@@ -96,9 +96,11 @@ const ev = (expression) => evaluate(client, expression);
 const wiring = await ev(
   `(() => {
      const p = app.plugins.plugins["snapto"];
-     return p ? { patched: p.patcher.installed, version: p.manifest.version } : null;
+     return p ? { patched: p.patcher.isActive, calls: p.patcher.callCount, version: p.manifest.version } : null;
    })()`,
 );
+// `isActive` can be true before anything opened, so the call count is the
+// assertion that cannot pass by accident: the wrapper has to have run.
 record("plugin loaded and prototypes wrapped", Boolean(wiring?.patched), wiring);
 
 /** Execute the command and wait for the prompt to exist; tolerate a slow start. */
@@ -165,6 +167,10 @@ const list = await ev(
 record("scene detected", list.scene !== null, list.scene);
 record("badges rendered", list.badges > 0, `${list.badges} badges for ${list.rows} rows`);
 record("shortcuts registered", list.shortcuts === 1, list.shortcuts);
+
+// The wrapper has to have run for the plugin to know about this surface at
+// all. `isActive` alone can be true before anything opened.
+record("the patched wrapper ran", wiring?.calls > 0, wiring?.calls);
 
 // Re-type three times in the quick switcher. It is a SuggestModal, so this
 // proves the list rebuild does not spawn contexts; the per-keystroke reopen bug

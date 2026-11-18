@@ -45,10 +45,19 @@ function isFileLike(value: unknown): boolean {
  * Heuristics only, strongest signal first. A wrong guess costs the user a
  * scene-specific toggle, never a broken shortcut: every modal keeps working
  * through the generic `plugin-modal` fallback.
+ *
+ * Returns `null` when the list carries no sample value to classify. That is
+ * the normal state right after the user typed something that matches nothing:
+ * the host renders a "press Enter to create" placeholder whose value is
+ * `null`. Guessing a scene from that placeholder would misfile the surface —
+ * and a misfiled surface is governed by the wrong scene's toggle, so a
+ * disabled scene could switch itself back on.
  */
-export function detectModalScene(values: readonly unknown[]): SceneId {
-  const sample = values.find((value) => readString(value, "type") !== "group");
-  if (sample === undefined) return "plugin-modal";
+export function detectModalScene(values: readonly unknown[]): SceneId | null {
+  const sample = values.find(
+    (value) => value !== null && value !== undefined && readString(value, "type") !== "group",
+  );
+  if (sample === undefined) return null;
   const item = unwrapSuggestion(sample);
   if (isCommandLike(item)) return "command-palette";
   if (isFileLike(item)) return "quick-switcher";
@@ -72,7 +81,9 @@ export function attachSuggestModal(modal: unknown): SuggestionContext | null {
   if (!list || !isElementLike(container)) return null;
 
   const values = readArray(list, "values") ?? [];
-  const scene = detectModalScene(values);
+  // A modal can open before it has any result. The generic scene is the
+  // fallback until the detector can say better.
+  const scene = detectModalScene(values) ?? "plugin-modal";
 
   const context = new SuggestionContext({
     id: nextId(scene),

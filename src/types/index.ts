@@ -64,9 +64,15 @@ export interface SearchContext {
   getCandidates(): Candidate[];
   getSelectedIndex(): number;
   /** Move the highlight only. Does not confirm the choice. */
-  setSelectedIndex(index: number): void;
-  /** Confirm a row the way the host would on click / Enter. */
-  commit(index: number): void;
+  setSelectedIndex(index: number, source?: Event): void;
+  /**
+   * Confirm a row the way the host would on click / Enter.
+   *
+   * `source` is the key event behind the choice. Hosts read the modifier
+   * flags off it to decide between replacing the current leaf and opening a
+   * new tab, so it has to travel with the confirmation.
+   */
+  commit(index: number, source?: Event): void;
   isAlive(): boolean;
   /** True when the highlight was moved by hand within the last `withinMs`. */
   wasManuallyMoved(withinMs: number): boolean;

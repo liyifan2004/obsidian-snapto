@@ -126,4 +126,55 @@ describe("HostPatcher", () => {
 
     expect(() => new SuggestModal().open()).not.toThrow();
   });
+
+  it("reports whether its wrapper is the live one", () => {
+    const patcher = new HostPatcher();
+    expect(patcher.isActive).toBe(false);
+
+    patcher.install(handlers());
+    expect(patcher.isActive).toBe(true);
+
+    patcher.uninstall();
+    expect(patcher.isActive).toBe(false);
+  });
+
+  it("counts the surfaces its wrapper saw", () => {
+    const patcher = new HostPatcher();
+    patcher.install(handlers());
+    expect(patcher.callCount).toBe(0);
+
+    new SuggestModal().open();
+    expect(patcher.callCount).toBe(1);
+
+    new SuggestModal().open();
+    expect(patcher.callCount).toBe(2);
+  });
+
+  it("stays active when another plugin wraps it and calls through", () => {
+    const patcher = new HostPatcher();
+    patcher.install(handlers());
+
+    // Another plugin puts its own layer on top of ours and calls through.
+    const ours = Object.getOwnPropertyDescriptor(SuggestModal.prototype, "open")
+      ?.value as ((this: unknown) => void) | undefined;
+    SuggestModal.prototype.open = function (this: unknown): void {
+      ours?.call(this);
+    };
+
+    new SuggestModal().open();
+
+    // Our layer is still in the chain, and it ran.
+    expect(patcher.callCount).toBe(1);
+    expect(patcher.isActive).toBe(true);
+  });
+
+  it("reports inactive when another plugin replaces the method entirely", () => {
+    const patcher = new HostPatcher();
+    patcher.install(handlers());
+
+    // A layer that does not call through: our wrapper is gone from the chain.
+    SuggestModal.prototype.open = function (): void {};
+
+    expect(patcher.isActive).toBe(false);
+  });
 });

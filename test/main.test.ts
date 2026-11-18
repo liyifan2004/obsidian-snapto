@@ -259,6 +259,70 @@ describe("plugin orchestration", () => {
     expect(internals.shortcuts.count()).toBe(1);
   });
 
+  it("removes the badges when the number shortcuts are turned off", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+    const host = makeHost(["Alpha", "Beta"]);
+    host.modal.open();
+    expect(badgeCount(host)).toBe(2);
+
+    // The digits and the number keys are one feature. Turning the keys off
+    // must not leave digits pointing at keys that no longer work.
+    internals.settings.quickSelectEnabled = false;
+    internals.onSettingsChanged();
+    expect(internals.shortcuts.count()).toBe(0);
+    expect(badgeCount(host)).toBe(0);
+
+    internals.settings.quickSelectEnabled = true;
+    internals.onSettingsChanged();
+    expect(badgeCount(host)).toBe(2);
+  });
+
+  it("keeps a disabled scene disabled when its list goes empty", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+    const host = makeHost(["Alpha", "Beta"]);
+    host.modal.open();
+
+    internals.settings.scenes["quick-switcher"].enabled = false;
+    internals.onSettingsChanged();
+    expect(internals.shortcuts.count()).toBe(0);
+
+    // The list empties. The host renders a "press Enter to create" row whose
+    // value is null, so the surface can no longer be classified — it must
+    // keep the scene it had, not fall back to another one.
+    host.values.length = 0;
+    (host.list as { values?: unknown[] }).values = [null];
+
+    internals.onSettingsChanged();
+
+    const context = internals.contexts.all()[0];
+    expect(context?.scene).toBe("quick-switcher");
+    expect(internals.shortcuts.count()).toBe(0);
+    expect(badgeCount(host)).toBe(0);
+  });
+
+  it("does not number the create-new-file placeholder", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+    const host = makeHost(["Alpha"]);
+    host.modal.open();
+    expect(badgeCount(host)).toBe(1);
+
+    // Swap the list for the placeholder Obsidian renders on no match.
+    host.container.textContent = "";
+    const row = host.container.createEl("div", { cls: "suggestion-item" });
+    const content = row.createEl("div", { cls: "suggestion-content" });
+    content.createEl("div", { cls: "suggestion-title", text: "zzz-nothing" });
+    row.createEl("div", { cls: "suggestion-aux" }).appendChild(
+      createSpan({ cls: "suggestion-action", text: "press Enter to create" }),
+    );
+    (host.list as { values?: unknown[] }).values = [null];
+
+    const context = internals.contexts.all()[0];
+    expect(context?.getCandidates()).toHaveLength(0);
+  });
+
   it("skips a disabled surface stacked above an enabled one", async () => {
     const { plugin, internals } = await boot();
     active = plugin;

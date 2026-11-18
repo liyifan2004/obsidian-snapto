@@ -7,6 +7,16 @@ export interface HostPatchHandlers {
   onSuggestOpen(host: unknown): void;
 }
 
+/** One patched method and the evidence that our layer is still in the chain. */
+interface PatchEntry {
+  target: Record<string, unknown>;
+  method: string;
+  /** The wrapper we installed. */
+  wrapped: unknown;
+  /** How many times our wrapper ran. */
+  calls: number;
+}
+
 /**
  * The only place in the plugin that replaces Obsidian's own methods.
  *
@@ -28,7 +38,42 @@ export interface HostPatchHandlers {
  */
 export class HostPatcher {
   private readonly restorers: Array<() => void> = [];
+  private readonly patches: PatchEntry[] = [];
   private installed = false;
+
+  /**
+   * Whether our wrapper is still reachable and really fires.
+   *
+   * `installed` only says that `install()` ran; it stays true for the whole
+   * session, so it cannot answer "are the prototypes patched right now" —
+   * the question a runtime check asks. Answering that with a flag that is
+   * always true is worse than not answering at all, because the check would
+   * pass on a plugin that never patched anything.
+   *
+   * Two things have to hold for each patched method. Our wrapper must still
+   * be the live property, or something must have called through it — a
+   * third-party layer that wraps ours still reaches us, and the call count
+   * is the evidence. A wrapper that was replaced by something that does not
+   * call through fails both, and that is the case worth catching.
+   */
+  get isActive(): boolean {
+    if (!this.installed) return false;
+    if (this.patches.length === 0) return false;
+    return this.patches.every((entry) => {
+      if (entry.target[entry.method] === entry.wrapped) return true;
+      return entry.calls > 0;
+    });
+  }
+
+  /**
+   * How many times our wrapper ran.
+   *
+   * A count above zero cannot be reached by accident: the wrapper has to
+   * have been called. The runtime check reads it after opening a surface.
+   */
+  get callCount(): number {
+    return this.patches.reduce((total, entry) => total + entry.calls, 0);
+  }
 
   install(handlers: HostPatchHandlers): void {
     if (this.installed) return;
@@ -46,10 +91,12 @@ export class HostPatcher {
     const hadOwn = Object.prototype.hasOwnProperty.call(proto, method);
     const fn = original as AnyFn;
     const state = { active: true };
+    const entry: PatchEntry = { target, method, wrapped: null, calls: 0 };
 
     const wrapped = function (this: unknown, ...args: unknown[]): unknown {
       const result = fn.apply(this, args);
       if (!state.active) return result;
+      entry.calls += 1;
       // Never let our bookkeeping break the host: an unexpected shape in a
       // third-party modal must cost us that modal, not the user's search.
       try {
@@ -60,7 +107,9 @@ export class HostPatcher {
       return result;
     };
 
+    entry.wrapped = wrapped;
     target[method] = wrapped;
+    this.patches.push(entry);
 
     this.restorers.push(() => {
       // From here on the wrapper only forwards.

@@ -63,7 +63,7 @@ export class ShortcutManager {
       const index = number - 1;
       const handler = scope.register([options.modifier], String(number), (evt: KeyboardEvent) => {
         if (evt.isComposing) return;
-        return this.onNumberKey(context, index);
+        return this.onNumberKey(context, index, evt);
       });
       handlers.push(handler);
     }
@@ -76,7 +76,7 @@ export class ShortcutManager {
     });
   }
 
-  private onNumberKey(context: SuggestionContext, index: number): boolean | void {
+  private onNumberKey(context: SuggestionContext, index: number, evt: KeyboardEvent): boolean | void {
     if (!context.isAlive()) return;
     const candidates = context.getCandidates();
     // A row past the end of the list must fall through to whatever else is bound.
@@ -85,7 +85,10 @@ export class ShortcutManager {
     const target = candidates[index];
     if (!target) return;
 
-    context.commit(target.index);
+    // The key event travels with the choice so the host can still see the
+    // modifier. Obsidian uses it to decide between replacing the current note
+    // and opening a new tab.
+    context.commit(target.index, evt);
     return false;
   }
 

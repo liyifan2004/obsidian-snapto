@@ -2,6 +2,36 @@
 
 All notable changes are recorded here. The format follows Keep a Changelog; versions follow SemVer.
 
+## [Unreleased]
+
+Five defects found by running the plugin in a real Obsidian 1.15.1 instance.
+All five were confirmed by measurement before the fix and by measurement after
+it; the regression tests fail when each fix is reverted.
+
+### Fixed
+
+- **Auto confirm created files the user never asked for.** Obsidian renders a
+  "press Enter to create <query>" row when a suggestion list has no match. Its
+  value is `null`, and the plugin treated it as a result: the row was numbered
+  as shortcut `1`, and because its title *was* the query, the match was exact,
+  so auto confirm opened it — creating a new file. The placeholder is no
+  longer a candidate and no longer gets a number.
+- **A disabled scene could switch itself back on.** When the list went empty,
+  the surface could no longer be classified, and the old code filed it under
+  the generic plugin modal. The wrong scene's toggle then decided whether the
+  shortcuts ran, so turning the "Quick switcher" scene off was undone as soon
+  as the user typed something that matched nothing. A surface now keeps the
+  scene it was confirmed to be.
+- **`Ctrl+2` replaced the open note instead of opening a new tab.** Obsidian
+  reads the modifier off the event it is handed to decide between the two. The
+  plugin handed it a synthetic event with no modifier flags, so the modifier
+  was dropped. The key event now travels with the choice.
+- **Turning the number shortcuts off left the numbers on screen.** The digits
+  and the number keys are one feature, so they answer the same question now.
+- **The runtime check's first assertion could not fail.** It read a flag that
+  was true for the whole session. The check now reads whether the wrapper is
+  still the live one and how many surfaces it has seen.
+
 ## [0.1.2] - 2026-11-13
 
 Turning a scene off now stays off.

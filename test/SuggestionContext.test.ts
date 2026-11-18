@@ -137,6 +137,75 @@ describe("SuggestionContext", () => {
     expect(parts.list.useSelectedItem).toHaveBeenCalledTimes(1);
   });
 
+  it("carries the modifier of the key that triggered the choice", () => {
+    const parts = buildList([{ title: "Alpha" }, { title: "Beta" }]);
+    const context = makeContext(parts);
+
+    // Obsidian reads the modifier off the event to decide between replacing
+    // the current leaf and opening a new tab. A synthetic event without the
+    // flags silently drops it.
+    context.commit(1, new KeyboardEvent("keydown", { key: "2", ctrlKey: true }));
+
+    const use = parts.list.useSelectedItem as unknown as ReturnType<typeof vi.fn>;
+    const event = use.mock.calls[0]?.[0] as KeyboardEvent;
+    expect(event.ctrlKey).toBe(true);
+  });
+
+  it("sends no modifier when the choice did not come from a key", () => {
+    const parts = buildList([{ title: "Alpha" }]);
+    const context = makeContext(parts);
+
+    context.commit(0);
+
+    const use = parts.list.useSelectedItem as unknown as ReturnType<typeof vi.fn>;
+    const event = use.mock.calls[0]?.[0] as KeyboardEvent;
+    expect(event.ctrlKey).toBe(false);
+    expect(event.metaKey).toBe(false);
+    expect(event.altKey).toBe(false);
+    expect(event.shiftKey).toBe(false);
+  });
+
+  it("reads the modifier off an event from another window", () => {
+    const parts = buildList([{ title: "Alpha" }]);
+    const context = makeContext(parts);
+
+    // A popout window's event fails `instanceof KeyboardEvent` in this realm,
+    // so the flags have to be read by shape or the modifier is lost there.
+    const foreign = {
+      type: "keydown",
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+    } as unknown as Event;
+
+    context.commit(0, foreign);
+
+    const use = parts.list.useSelectedItem as unknown as ReturnType<typeof vi.fn>;
+    const event = use.mock.calls[0]?.[0] as KeyboardEvent;
+    expect(event.ctrlKey).toBe(true);
+  });
+
+  it("ignores the modifier flags of a mouse event", () => {
+    const parts = buildList([{ title: "Alpha" }]);
+    const context = makeContext(parts);
+
+    // A click carries ctrlKey as well, but it is not a key press.
+    const mouse = {
+      type: "click",
+      ctrlKey: true,
+      metaKey: false,
+      altKey: false,
+      shiftKey: false,
+    } as unknown as Event;
+
+    context.commit(0, mouse);
+
+    const use = parts.list.useSelectedItem as unknown as ReturnType<typeof vi.fn>;
+    const event = use.mock.calls[0]?.[0] as KeyboardEvent;
+    expect(event.ctrlKey).toBe(false);
+  });
+
   it("highlights without confirming", () => {
     const parts = buildList([{ title: "Alpha" }]);
     const context = makeContext(parts);
@@ -205,6 +274,51 @@ describe("SuggestionContext", () => {
     // Only losing the container ends the surface.
     parts.container.remove();
     expect(context.isAlive()).toBe(false);
+  });
+
+  it("does not offer the create-new-file placeholder as a result", () => {
+    // Obsidian renders this row when nothing matches: the title is the query
+    // the user typed and the aux area carries the "press Enter to create" hint.
+    const container = createEl("div", { cls: "prompt-results" });
+    const row = container.createEl("div", { cls: "suggestion-item" });
+    const content = row.createEl("div", { cls: "suggestion-content" });
+    content.createEl("div", { cls: "suggestion-title", text: "zzz-nothing" });
+    row.createEl("div", { cls: "suggestion-aux" }).appendChild(
+      createSpan({ cls: "suggestion-action", text: "press Enter to create" }),
+    );
+    document.body.appendChild(container);
+
+    const list: SuggestionListLike = {
+      values: [null],
+      selectedItem: 0,
+      containerEl: container,
+      setSelectedItem: vi.fn(),
+      useSelectedItem: vi.fn(() => true),
+    };
+    const context = makeContext({ container, list, values: list.values as unknown[] });
+
+    expect(context.getCandidates()).toHaveLength(0);
+  });
+
+  it("keeps the last confirmed scene when the list goes empty", () => {
+    const parts = buildList([{ title: "Alpha" }]);
+    const context = makeContext(parts);
+    context.setSceneResolver(() => "quick-switcher");
+    expect(context.scene).toBe("quick-switcher");
+
+    // The list emptied: the detector can no longer tell what this is.
+    context.setSceneResolver(() => null);
+    expect(context.scene).toBe("quick-switcher");
+  });
+
+  it("takes a newly detected scene once the list has results again", () => {
+    const parts = buildList([{ title: "Alpha" }]);
+    const context = makeContext(parts);
+    context.setSceneResolver(() => "quick-switcher");
+    expect(context.scene).toBe("quick-switcher");
+
+    context.setSceneResolver(() => "command-palette");
+    expect(context.scene).toBe("command-palette");
   });
 
   it("reports the selected index from the host list", () => {

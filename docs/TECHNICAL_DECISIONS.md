@@ -378,3 +378,139 @@ The sweep is lazy: a window that closes while nothing else opens stays reference
 
 - A session that opens a popout and never opens another surface keeps that document referenced until unload. Accepted, and written down rather than left to be rediscovered.
 - If a future Obsidian release starts firing `pagehide` for popouts, nothing breaks: the sweep still runs, and `stop()` covers the rest.
+
+---
+
+## 0017. The create-new-file placeholder is not a result
+
+**Date:** 2026-11-19 · **Status:** accepted
+
+### Context
+
+Obsidian renders a "press Enter to create <query>" row when a suggestion list has no match. Measured on 1.15.1: the row is a real `.suggestion-item`, its title is the query the user typed, and its value in `chooser.values` is `null`.
+
+The plugin treated that row as a result. Two consequences, both measured in the app before the fix:
+
+- The row was offered as a numbered shortcut, so `Ctrl+1` on an empty list would create a file.
+- With auto confirm on, typing a name that matched nothing **created that file**: the query matched the placeholder's own title at the `exact` level, which is a confident level, so the plugin committed it. The file was created without the user asking for it.
+
+### Decision
+
+A value that is `null` or `undefined` is not selectable, and a row carrying `.suggestion-action` is not a result either. Both checks are applied where values are paired with rows and where badges are drawn.
+
+### Rationale
+
+The placeholder is an *action*, not a *result*. The plugin answers "which of these should I open", and a row that says "press Enter to create" is answering a different question.
+
+Two independent checks rather than one: the value is the primary signal, and the markup is the backup for a host that ever gives the placeholder a non-null value. Either one alone is enough to keep the file from being created.
+
+### Consequences
+
+- An empty list now offers no candidates and no badges, which is what the user sees anyway — Obsidian renders the placeholder in a dimmer style than a real result.
+- Auto match no longer acts on an empty list. It had nothing to match anyway; the placeholder only ever matched because its title *was* the query.
+
+---
+
+## 0018. A surface keeps its scene when it cannot be classified
+
+**Date:** 2026-11-19 · **Status:** accepted
+
+### Context
+
+Scene detection reads the shape of the first value in the list. An empty list carries no sample, so it cannot be classified — the old code answered `plugin-modal` and moved on.
+
+The consequence was not cosmetic. A user who turned the "Quick switcher" scene off saw the shortcuts come back as soon as the list went empty: the surface was re-filed under `plugin-modal`, and *that* scene's toggle then decided whether the shortcuts ran. Measured on 1.15.1: with `quick-switcher` disabled and `plugin-modal` enabled, the shortcut count went from 0 back to 1 and a badge appeared on the placeholder row.
+
+### Decision
+
+The detector returns `null` when it cannot classify, and the context keeps the last scene it was able to confirm. The generic `plugin-modal` fallback applies only to the moment before anything is known.
+
+### Rationale
+
+A scene is a property of the surface, not of its current contents. The surface was opened as a quick switcher; emptying the list does not turn it into something else. Keeping the last confirmed value means a toggle applies to the surface the user is actually looking at.
+
+### Consequences
+
+- `detectModalScene` returns `SceneId | null` instead of `SceneId`. Callers that need a concrete scene fall back to `plugin-modal` at attach time.
+- The scene can no longer change because the contents changed. A surface that is genuinely reused for a different purpose would keep its first classification — that does not happen in Obsidian, where each modal type has its own class.
+
+---
+
+## 0019. The badges and the number keys are one switch
+
+**Date:** 2026-11-19 · **Status:** accepted
+
+### Context
+
+"Enable number shortcuts" governed the number keys only. The badge digits were governed by "Show result numbers", a separate setting. Turning the shortcuts off left the digits on screen, pointing at keys that no longer did anything.
+
+### Decision
+
+One predicate answers for both: `quickSelectEnabled` and the scene must both allow it.
+
+### Rationale
+
+The digits advertise the keys. A digit next to a result is a promise that pressing that digit selects the result, and the promise has to die with the feature.
+
+The two settings stay separate otherwise — "Show result numbers" still decides *whether* digits are drawn and *when* they appear, while "Enable number shortcuts" decides whether the feature is on at all.
+
+### Consequences
+
+- Turning off the number shortcuts also removes the digits.
+- `showBadges: false` still hides the digits while leaving the keys working, which is the combination the setting names describe.
+
+---
+
+## 0020. The key event travels with the choice
+
+**Date:** 2026-11-19 · **Status:** accepted
+
+### Context
+
+Obsidian decides whether a chosen file replaces the current leaf or opens in a
+new tab by reading the modifier flags off the event it is handed:
+
+```js
+// Obsidian 1.15.1, app.js — the quick switcher
+onChooseSuggestion(e, t) {
+  var i = Keymap.isModEvent(t);   // only looks at t's modifier flags
+  ...
+  this.app.workspace.getLeaf(i).openFile(e.file, { active: true });
+}
+```
+
+`Keymap.isModEvent` returns `"tab"` when the event has the `Mod` modifier and
+`false` otherwise. A plain synthetic `KeyboardEvent` has no modifier flags, so
+it reads as "no modifier".
+
+The plugin built exactly such an event: `makeKeyEvent()` returned a bare
+`KeyboardEvent("keydown", { key: "Enter" })`. The modifier the user was
+holding was dropped on the way to the host. Measured on 1.15.1: `Ctrl+2`
+replaced the open note instead of opening the target in a new tab, and the
+user had no way to get the stock behaviour back.
+
+### Decision
+
+The key event that triggered the choice travels with it. `commit(index,
+source)` and `setSelectedIndex(index, source)` take it, and
+`makeKeyEvent(source)` copies the four modifier flags onto the synthetic
+event. For the command palette path, where no key event of its own exists,
+`app.lastEvent` is used — the same source Obsidian itself uses for actions
+that were not triggered by a key press.
+
+### Rationale
+
+The host reads the event to answer "what did the user ask for". A synthetic
+event that says "Enter, no modifier" is a different request from
+"Ctrl+2", and the host has no way to tell that the plugin meant to pass the
+modifier along.
+
+### Consequences
+
+- `Ctrl+2` opens the result in a new tab, matching the stock quick switcher.
+  Verified on 1.15.1: leaf count goes from 1 to 2 instead of staying at 1.
+- `commit` and `setSelectedIndex` take an optional source event. Callers that
+  have none (auto match acting on its own) pass nothing and produce an event
+  with no modifiers, which is the correct request for "just open it".
+- The `SearchContext` interface changed with it, because the event is part of
+  the contract rather than an implementation detail.
