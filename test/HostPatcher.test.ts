@@ -150,7 +150,7 @@ describe("HostPatcher", () => {
     expect(patcher.callCount).toBe(2);
   });
 
-  it("stays active when another plugin wraps it and calls through", () => {
+  it("keeps counting the surfaces it saw when another plugin wraps it", () => {
     const patcher = new HostPatcher();
     patcher.install(handlers());
 
@@ -165,7 +165,8 @@ describe("HostPatcher", () => {
 
     // Our layer is still in the chain, and it ran.
     expect(patcher.callCount).toBe(1);
-    expect(patcher.isActive).toBe(true);
+    // But the host now calls their layer, not ours.
+    expect(patcher.isActive).toBe(false);
   });
 
   it("reports inactive when another plugin replaces the method entirely", () => {
@@ -176,5 +177,23 @@ describe("HostPatcher", () => {
     SuggestModal.prototype.open = function (): void {};
 
     expect(patcher.isActive).toBe(false);
+  });
+
+  it("is not active when one of the two patches is replaced", () => {
+    const patcher = new HostPatcher();
+    patcher.install(handlers());
+
+    // Both wrappers ran, so the history says "we were there".
+    new SuggestModal().open();
+    new PopoverSuggest().open();
+    expect(patcher.callCount).toBe(2);
+
+    // One of them is replaced by something that does not call through. The
+    // accumulated count must not paper over that.
+    PopoverSuggest.prototype.open = function (): void {};
+
+    expect(patcher.isActive).toBe(false);
+    // The count is history; it stays where it was.
+    expect(patcher.callCount).toBe(2);
   });
 });

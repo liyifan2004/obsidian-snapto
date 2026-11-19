@@ -93,16 +93,27 @@ if (!main) throw new Error("no Obsidian window found on port " + PORT);
 const client = await connect(main.webSocketDebuggerUrl);
 const ev = (expression) => evaluate(client, expression);
 
-const wiring = await ev(
-  `(() => {
-     const p = app.plugins.plugins["snapto"];
-     return p ? { patched: p.patcher.isActive, calls: p.patcher.callCount, version: p.manifest.version } : null;
-   })()`,
-);
-// `isActive` can be true before anything opened, so the call count is the
-// assertion that cannot pass by accident: the wrapper has to have run.
-record("plugin loaded and prototypes wrapped", Boolean(wiring?.patched), wiring);
+/**
+ * Read the patcher's state.
+ *
+ * A function rather than a value: the call count only grows once a surface
+ * has opened, so an assertion about it has to read the state *after* that
+ * happened. A snapshot taken once at the top of the file reads zero for the
+ * whole run and fails for a reason that has nothing to do with the plugin.
+ */
+const readWiring = () =>
+  ev(
+    `(() => {
+       const p = app.plugins.plugins["snapto"];
+       return p ? { patched: p.patcher.isActive, calls: p.patcher.callCount, version: p.manifest.version } : null;
+     })()`,
+  );
 
+const wiring = await readWiring();
+// `isActive` answers "is our wrapper still the property the host calls".
+// It can be true before anything opened, so the call count is the assertion
+// that cannot pass by accident: the wrapper has to have run.
+record("plugin loaded and prototypes wrapped", Boolean(wiring?.patched), wiring);
 /** Execute the command and wait for the prompt to exist; tolerate a slow start. */
 async function openSwitcher() {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -169,8 +180,10 @@ record("badges rendered", list.badges > 0, `${list.badges} badges for ${list.row
 record("shortcuts registered", list.shortcuts === 1, list.shortcuts);
 
 // The wrapper has to have run for the plugin to know about this surface at
-// all. `isActive` alone can be true before anything opened.
-record("the patched wrapper ran", wiring?.calls > 0, wiring?.calls);
+// all. `isActive` alone can be true before anything opened, so the count is
+// read again here — after the switcher opened, not before.
+const wiringAfterOpen = await readWiring();
+record("the patched wrapper ran", (wiringAfterOpen?.calls ?? 0) > 0, wiringAfterOpen?.calls);
 
 // Re-type three times in the quick switcher. It is a SuggestModal, so this
 // proves the list rebuild does not spawn contexts; the per-keystroke reopen bug

@@ -98,7 +98,9 @@ SnapTo does **not** style `.suggestion-item` or any other core class. Badges are
 
 ## Version policy
 
-`minAppVersion` is `1.5.0`, `isDesktopOnly` is `true`. Everything SnapTo calls exists in 1.5.0; the internal fields above were confirmed by reading 1.5.12 and 1.13.4 and by running 1.15.1.
+`minAppVersion` is `1.5.0`, `isDesktopOnly` is `true`. The internal fields above were confirmed by reading 1.5.12 and 1.13.4 and by running 1.15.1.
+
+One documented API sits above the floor: `Plugin.onExternalSettingsChange` is `@since 1.5.7`. The plugin *implements* it rather than calling it, and the host guards the call with `this.onExternalSettingsChange &&`, so on 1.5.0-1.5.6 the feature is simply absent — settings synced from another device are picked up on the next reload instead of immediately. Nothing breaks.
 
 Desktop only is a product decision, not a technical limit: the feature is a modifier plus a digit, which has no mobile equivalent. See decision 0010.
 

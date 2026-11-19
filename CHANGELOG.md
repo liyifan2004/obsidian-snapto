@@ -4,9 +4,10 @@ All notable changes are recorded here. The format follows Keep a Changelog; vers
 
 ## [Unreleased]
 
-Five defects found by running the plugin in a real Obsidian 1.15.1 instance.
-All five were confirmed by measurement before the fix and by measurement after
-it; the regression tests fail when each fix is reverted.
+Ten defects found by running the plugin in a real Obsidian 1.15.1 instance
+and by an independent audit of the code against its own documentation. All of
+them were confirmed by measurement before the fix and by measurement after
+it; every fix has a test that fails when the fix is reverted.
 
 ### Fixed
 
@@ -30,7 +31,39 @@ it; the regression tests fail when each fix is reverted.
   and the number keys are one feature, so they answer the same question now.
 - **The runtime check's first assertion could not fail.** It read a flag that
   was true for the whole session. The check now reads whether the wrapper is
-  still the live one and how many surfaces it has seen.
+  still the property the host calls, plus how many surfaces it has seen.
+- **The badge on a row could point at a different row than `Ctrl+N` opened.**
+  What counted as a result was decided twice — by DOM class for the badges and
+  by the value's type for the candidates — and the two disagreed on a group
+  header that carried another type. There is now one list of pickable rows and
+  one numbering, so the two cannot drift apart.
+- **A third party's decoration row could make the plugin match the wrong
+  note.** When the row count and the value count drift, rows were paired with
+  values by position, so "Alpha" was read off the decoration row's text. Rows
+  are now matched to values by their text; a value with no matching row gets
+  none rather than a wrong one.
+
+### Changed
+
+- The settings descriptions now say what the code does: `ignoreSeparators`
+  flattens every match to the normalized level rather than "applying to
+  normalized matches only", and the conflict policies take the strongest or
+  the weakest match rather than "the first" or "the last result".
+- The README separates what is technically out of reach from what is not
+  built yet, and describes the match strength as a floor rather than a
+  ladder.
+- `scripts/check-api-since.mjs` compares the `@since` annotation of every
+  documented API the plugin uses against `minAppVersion`. It found
+  `Plugin.onExternalSettingsChange`, which is `@since 1.5.7` while the floor
+  is `1.5.0`; the gap is now recorded in the compatibility table.
+
+### Tests
+
+- 132 → 164.
+- Three behaviours that users can feel had no test guarding them and now
+  have one: the manual-navigation back-off, the weight that decides which of
+  two equally-matching rows wins, and whether the number key is swallowed
+  after a choice.
 
 ## [0.1.2] - 2026-11-13
 

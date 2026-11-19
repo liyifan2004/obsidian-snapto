@@ -42,7 +42,7 @@ export class HostPatcher {
   private installed = false;
 
   /**
-   * Whether our wrapper is still reachable and really fires.
+   * Whether our wrapper is still the property the host will call.
    *
    * `installed` only says that `install()` ran; it stays true for the whole
    * session, so it cannot answer "are the prototypes patched right now" —
@@ -50,26 +50,24 @@ export class HostPatcher {
    * always true is worse than not answering at all, because the check would
    * pass on a plugin that never patched anything.
    *
-   * Two things have to hold for each patched method. Our wrapper must still
-   * be the live property, or something must have called through it — a
-   * third-party layer that wraps ours still reaches us, and the call count
-   * is the evidence. A wrapper that was replaced by something that does not
-   * call through fails both, and that is the case worth catching.
+   * This answers one question only: is our wrapper still the one on the
+   * prototype? Another plugin wrapping the method on top of us changes the
+   * answer, and that is the truth worth reporting — the host will call their
+   * layer, not ours.
    */
   get isActive(): boolean {
     if (!this.installed) return false;
     if (this.patches.length === 0) return false;
-    return this.patches.every((entry) => {
-      if (entry.target[entry.method] === entry.wrapped) return true;
-      return entry.calls > 0;
-    });
+    return this.patches.every((entry) => entry.target[entry.method] === entry.wrapped);
   }
 
   /**
    * How many times our wrapper ran.
    *
    * A count above zero cannot be reached by accident: the wrapper has to
-   * have been called. The runtime check reads it after opening a surface.
+   * have been called. It is history, not current state — it stays above zero
+   * after the wrapper stops being the live property, so it cannot answer
+   * "is the patch still in place".
    */
   get callCount(): number {
     return this.patches.reduce((total, entry) => total + entry.calls, 0);

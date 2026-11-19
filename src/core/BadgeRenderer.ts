@@ -1,4 +1,4 @@
-import { isCreatePlaceholderRow, type SuggestionContext } from "./SuggestionContext";
+import type { SuggestionContext } from "./SuggestionContext";
 
 export const BADGE_CLASS = "snapto-index";
 export const BADGE_ALWAYS_CLASS = "is-always";
@@ -11,6 +11,10 @@ export const MAX_BADGES = 9;
  * markup belongs to other plugins: styling `.suggestion-item` from our sheet
  * would leak into every third-party suggester. A span we own and remove is
  * narrower, and it also gives us an exact handle for cleanup.
+ *
+ * The numbering comes from the context's own list of pickable rows, so the
+ * digit on a row and the row that `Ctrl+N` opens are the same row. Deciding
+ * "what is a result" twice made them drift apart.
  */
 export class BadgeRenderer {
   /** Add or refresh badges. Safe to call on every list mutation. */
@@ -43,18 +47,17 @@ export class BadgeRenderer {
   }
 
   /**
-   * Rows that can actually be picked.
+   * Rows that can actually be picked, in the order the numbers run.
    *
-   * Group headers and the "press Enter to create" placeholder are rendered as
-   * rows but are not results. Numbering them would promise a shortcut that
-   * does not do what the row says it does.
+   * The context decides; this method only takes what it hands out. A row
+   * that cannot be chosen — a group header, an empty-state row, the "press
+   * Enter to create" placeholder — never gets a number, because a number
+   * promises a shortcut and the shortcut would do something else.
    */
   private selectableRows(context: SuggestionContext): HTMLElement[] {
     const rows: HTMLElement[] = [];
-    for (const row of context.getRows()) {
-      if (row.hasClass("mod-group") || row.hasClass("suggestion-empty")) continue;
-      if (isCreatePlaceholderRow(row)) continue;
-      rows.push(row);
+    for (const pair of context.getSelectableRows()) {
+      if (pair.row) rows.push(pair.row);
     }
     return rows;
   }

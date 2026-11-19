@@ -28,9 +28,9 @@
 
 1. **Popover suggests in the wild.** `AbstractInputSuggest` and friends are wired, but no third-party surface was exercised. Pick two popular plugins that use them and re-run the runtime check.
 2. **Light theme.** Only the dark theme has been looked at. Badges use theme variables only, but contrast has not been measured.
-3. **`Plugin.onExternalSettingsChange`.** Settings edited on another device are not picked up until reload.
-4. **Command alternatives for users who prefer Obsidian hotkeys.** Nine `select-result-N` commands exist; document a worked example of binding `Alt+1..9`.
-5. **Keyboard navigation of the badge state.** Today arrow keys suppress auto match for 1.2 s. A shorter, configurable value would suit fast typists.
+3. **Command alternatives for users who prefer Obsidian hotkeys.** Nine `select-result-N` commands exist; document a worked example of binding `Alt+1..9`.
+4. **Keyboard navigation of the badge state.** Today arrow keys suppress auto match for 1.2 s. A shorter, configurable value would suit fast typists.
+5. **A `@since` check against `minAppVersion`.** `Plugin.onExternalSettingsChange` is `@since 1.5.7` while `minAppVersion` is `1.5.0`, so the API compatibility table has to be maintained by hand today. A script that compares the `@since` annotations of everything the plugin calls against `minAppVersion` would keep the two honest.
 
 ## Later
 

@@ -18,9 +18,42 @@ export interface SuggestionListLike {
   useSelectedItem?: (evt?: unknown) => boolean;
 }
 
+/**
+ * Value types that stand for a heading rather than a result.
+ *
+ * Obsidian uses `"group"` for the section headers in a list. The search
+ * suggester also pushes `"property-key"` entries, which are real results, so
+ * they are deliberately not in this set.
+ */
+const GROUP_VALUE_TYPES = new Set(["group"]);
+
 /** Group headers are rendered as rows but cannot be chosen. */
 function isGroupValue(value: unknown): boolean {
-  return readString(value, "type") === "group";
+  const type = readString(value, "type");
+  return type !== null && GROUP_VALUE_TYPES.has(type);
+}
+
+/**
+ * Whether a row is one of the host's section headers.
+ *
+ * The host marks them with `mod-group`. A row that carries the class is a
+ * heading even when its value says something else, so the badge renderer and
+ * the candidate list agree on which rows are results.
+ */
+export function isGroupRow(row: HTMLElement): boolean {
+  return row.hasClass("mod-group");
+}
+
+/**
+ * Text of a row, reduced to something two renderings can be compared by.
+ *
+ * A row's title and the value behind it are not always spelled the same way:
+ * one is a file's basename, the other its path, and a path may carry the
+ * extension. Case and whitespace are ignored, because a host is free to
+ * capitalise a title.
+ */
+function comparableText(text: string): string {
+  return text.trim().toLowerCase();
 }
 
 /**
@@ -184,6 +217,22 @@ export class SuggestionContext implements SearchContext {
   }
 
   /**
+   * Rows the user can actually pick, in order.
+   *
+   * This is the single source of truth for "what is a result". The badges are
+   * numbered from it and the number shortcuts read from it, so the digit on a
+   * row and the row that `Ctrl+1` opens are the same row by construction.
+   *
+   * It used to be decided twice: the badge renderer filtered on DOM classes
+   * while the candidate list filtered on the value's type. Where the two
+   * disagreed — a group header that carried a type other than `"group"` —
+   * the badge "1" sat on one row while `Ctrl+1` opened another.
+   */
+  getSelectableRows(): Array<{ index: number; row: HTMLElement | undefined }> {
+    return this.pairedRows();
+  }
+
+  /**
    * Pair each selectable value with the row that renders it.
    *
    * The host renders one row per value, group headers included. When a third
@@ -197,29 +246,78 @@ export class SuggestionContext implements SearchContext {
    * Every caller that needs "row for value index" goes through here; keeping one
    * implementation is what stops read and click paths from disagreeing.
    */
+  /**
+   * Pair each selectable value with the row that renders it.
+   *
+   * The host renders one row per value, group headers included. When a third
+   * party inserts extra decoration the counts drift, and pairing by position
+   * then reads the wrong title: "Alpha" would be matched against the
+   * decoration row's text, and the plugin would act on the wrong note.
+   *
+   * So the two cases are handled differently:
+   *
+   * - The counts line up: the value at index i is rendered by the row at
+   *   index i. A row is dropped only if the value says so *or* the row says
+   *   so, so the badges and the shortcuts see the same list.
+   * - The counts drift: the rows are matched to the values by their text
+   *   instead of by position. A value whose text is nowhere among the rows
+   *   gets no row rather than a wrong one — the value index is still right,
+   *   and the choice still lands on the right suggestion.
+   */
   private pairedRows(): Array<{ index: number; row: HTMLElement | undefined }> {
     const values = this.getValues();
     const rows = this.getRows();
-    const oneRowPerValue = rows.length === values.length;
-    const plainRows = rows.filter(
-      (row) =>
-        !row.hasClass("mod-group") &&
-        !row.hasClass("suggestion-empty") &&
-        !isCreatePlaceholderRow(row),
-    );
 
-    const pairs: Array<{ index: number; row: HTMLElement | undefined }> = [];
-    let cursor = 0;
+    // Rows the user cannot pick, whatever their value says.
+    const unpickableRow = (row: HTMLElement): boolean =>
+      isGroupRow(row) ||
+      row.hasClass("suggestion-empty") ||
+      isCreatePlaceholderRow(row);
+
+    const plainRows = rows.filter((row) => !unpickableRow(row));
+
+    const pickable: number[] = [];
     for (let index = 0; index < values.length; index += 1) {
       if (isGroupValue(values[index])) continue;
       if (!isSelectableValue(values[index])) continue;
-      const row = oneRowPerValue ? rows[index] : plainRows[cursor];
-      // A placeholder row is an action, not a result, whatever its value is.
-      if (row && isCreatePlaceholderRow(row)) {
-        cursor += 1;
+      pickable.push(index);
+    }
+
+    const pairs: Array<{ index: number; row: HTMLElement | undefined }> = [];
+
+    if (rows.length === values.length) {
+      // The counts line up, so the positions agree.
+      for (const index of pickable) {
+        const row = rows[index];
+        if (row && unpickableRow(row)) continue;
+        pairs.push({ index, row });
+      }
+      return pairs;
+    }
+
+    // The counts drifted. Match by text: a row belongs to the value whose
+    // title it shows.
+    const taken = new Set<HTMLElement>();
+    for (const index of pickable) {
+      const wanted = comparableText(textFromValue(values[index]));
+      let row: HTMLElement | undefined;
+      if (wanted.length > 0) {
+        for (const candidate of plainRows) {
+          if (taken.has(candidate)) continue;
+          if (comparableText(readRowText(candidate)) === wanted) {
+            row = candidate;
+            break;
+          }
+        }
+      }
+      if (!row) {
+        // No row carries this value's title. Leave it unpaired rather than
+        // guess: the text falls back to the value, and the choice still goes
+        // to the right index.
+        pairs.push({ index, row: undefined });
         continue;
       }
-      cursor += 1;
+      taken.add(row);
       pairs.push({ index, row });
     }
     return pairs;

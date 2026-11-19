@@ -514,3 +514,54 @@ modifier along.
   with no modifiers, which is the correct request for "just open it".
 - The `SearchContext` interface changed with it, because the event is part of
   the contract rather than an implementation detail.
+
+---
+
+## 0021. One list of pickable rows, one numbering
+
+**Date:** 2026-11-19 · **Status:** accepted
+
+### Context
+
+"What counts as a result" was decided twice: the badge renderer filtered on
+DOM classes, and the candidate list filtered on the value's `type`. The two
+rules agreed on the common case and disagreed on the rest.
+
+A group header whose value carried a type other than `"group"` — the search
+suggester pushes `property-key` entries next to `group` headings — put the
+badge "1" on one row while `Ctrl+1` opened another. The user pressed the key
+next to a title and got something else.
+
+The two filters also disagreed about *how* to pair a value with a row when
+the counts drift. Pairing by position read a title off a third party's
+decoration row: "Alpha" was matched against the decoration row's text, and
+the plugin acted on the wrong note.
+
+### Decision
+
+`SuggestionContext.getSelectableRows()` is the single source of truth. The
+badge renderer takes its rows from it, and the candidate list is built from
+it. A row is pickable when neither side says otherwise: the value is not a
+group and not null, and the row is not a group header, not an empty-state
+row and not the "press Enter to create" placeholder.
+
+When the row count and the value count drift, rows are matched to values by
+their text instead of by position. A value whose title is nowhere among the
+rows gets no row rather than a wrong one.
+
+### Rationale
+
+A number on a row is a promise that pressing that number opens that row.
+Two filters make that promise impossible to keep. One filter makes it
+structural: the badge is drawn on row N of the list, and `Ctrl+N` opens row
+N of the same list.
+
+Matching by text rather than by position costs a comparison per value and
+removes a whole class of wrong-file bugs.
+
+### Consequences
+
+- The badge and the shortcut cannot drift apart.
+- A value whose title is not rendered keeps its index, and its text falls
+  back to the value — the choice still lands on the right suggestion.
+- `BadgeRenderer` no longer inspects classes; it asks the context.

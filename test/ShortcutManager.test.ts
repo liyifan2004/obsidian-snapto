@@ -114,6 +114,23 @@ describe("ShortcutManager", () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  it("swallows the key after a choice, so the host does not act on it too", () => {
+    const scope = fakeScope();
+    const { context, commit } = fakeContext(candidates);
+    (context as unknown as { scope: unknown }).scope = scope;
+
+    const manager = new ShortcutManager();
+    manager.sync(context, { enabled: true, modifier: "Mod", maxIndex: 9, scene: "quick-switcher" });
+
+    // Obsidian only calls `preventDefault` when a handler returns exactly
+    // `false`. Anything else lets the default action run as well — so
+    // `Ctrl+2` would both pick the result and do whatever `Ctrl+2` means
+    // in the surface underneath.
+    const result = scope.handlers[2]?.run(keyEvent());
+    expect(result).toBe(false);
+    expect(commit).toHaveBeenCalled();
+  });
+
   it("ignores keys typed during IME composition", () => {
     const scope = fakeScope();
     const { context, commit } = fakeContext(candidates);

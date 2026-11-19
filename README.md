@@ -28,10 +28,17 @@ Suggestion dialogs opened by other plugins go through the same code path, but no
 
 ## What it does not do
 
-- No global search panel support. The panel has no selection model to drive; see [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
+Two kinds of gap, and they are not the same kind:
+
+**Technically out of reach**
+
 - No in-note find (`Ctrl+F`). It highlights text inside the document, it is not a result list.
-- No native outline search. Obsidian's outline is a view, not a search box.
 - Nothing inside the settings window. That window runs in its own context, so the suggestion lists there are not touched at all.
+
+**Not built yet, on purpose**
+
+- No global search panel support. Its results are blocks in a scrolling pane with no row to select, so it needs a different kind of interaction rather than a shortcut. Deferred to 0.2.
+- No native outline search. Obsidian's outline does have a search box, but it filters the heading tree in place instead of producing a list of results, so there is nothing to number.
 
 The full list of surfaces, environments and how each was verified is in [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md).
 
@@ -52,8 +59,8 @@ Requires Obsidian 1.5.0 or newer, desktop only. The feature is a modifier plus a
 | Auto match | on | Watches the result list, not the input. |
 | When a match is found | highlight only | Confirm selection is limited to exact and normalized matches. |
 | Idle delay | 1000 ms | Range 200-5000 ms. |
-| Minimum match strength | contains | `exact` → `normalized` → `prefix` → `contains` → `fuzzy`. |
-| Several equally good matches | do nothing | Or take the first / last, or never act. |
+| Minimum match strength | contains | A floor, not a ladder: `exact` accepts only exact matches, `fuzzy` accepts anything from exact down to fuzzy. |
+| Several equally good matches | do nothing | Or take the strongest / weakest match, or never act. |
 | Modifier key | Mod (Cmd / Ctrl) | Alt is unreliable on Windows. |
 | Scenes | all on | Per-surface switches. Disabled scenes behave exactly like stock Obsidian. |
 

@@ -8,12 +8,14 @@ interface Harness {
   committed: number[];
   selected(): number;
   setQuery(query: string): void;
+  setManuallyMoved(value: boolean): void;
 }
 
 function harness(titles: string[], selected = 0): Harness {
   let query = "";
   let index = selected;
   const committed: number[] = [];
+  let manuallyMoved = false;
 
   const context = {
     id: "ctx",
@@ -32,7 +34,10 @@ function harness(titles: string[], selected = 0): Harness {
       index = next;
       committed.push(next);
     },
-    wasManuallyMoved: () => false,
+    // The stand-in has to honour `withinMs`, because that argument *is* the
+    // grace period: a stub that ignores it would pass no matter how the
+    // constant is tuned, and the back-off would have no test guarding it.
+    wasManuallyMoved: (withinMs: number) => manuallyMoved && withinMs > 0,
   } as unknown as SuggestionContext;
 
   return {
@@ -41,6 +46,9 @@ function harness(titles: string[], selected = 0): Harness {
     selected: () => index,
     setQuery: (next: string) => {
       query = next;
+    },
+    setManuallyMoved: (value: boolean) => {
+      manuallyMoved = value;
     },
   };
 }
@@ -150,5 +158,38 @@ describe("AutoMatchManager.runNow", () => {
     const { manager } = buildManager({ enabled: false });
 
     expect(manager.runNow(h.context)).toBe(false);
+  });
+});
+
+describe("AutoMatchManager backs off while the user navigates by hand", () => {
+  it("does not move the highlight while the user is choosing", () => {
+    const h = harness(["Alpha Project", "Beta Review"]);
+    h.setQuery("Beta");
+    h.setManuallyMoved(true);
+    const { manager } = buildManager();
+
+    // The user pressed an arrow key a moment ago: their choice wins.
+    expect(manager.runNow(h.context)).toBe(false);
+    expect(h.selected()).toBe(0);
+  });
+
+  it("does not confirm either", () => {
+    const h = harness(["Beta Review"]);
+    h.setQuery("Beta Review");
+    h.setManuallyMoved(true);
+    const { manager } = buildManager({ action: "confirm" });
+
+    expect(manager.runNow(h.context)).toBe(false);
+    expect(h.committed).toHaveLength(0);
+  });
+
+  it("acts again once the grace period has passed", () => {
+    const h = harness(["Alpha Project", "Beta Review"]);
+    h.setQuery("Beta");
+    h.setManuallyMoved(false);
+    const { manager } = buildManager();
+
+    expect(manager.runNow(h.context)).toBe(true);
+    expect(h.selected()).toBe(1);
   });
 });

@@ -62,6 +62,14 @@ export interface SearchContext {
   readonly inputEl: HTMLElement | null;
   getQuery(): string;
   getCandidates(): Candidate[];
+  /**
+   * Rows the user can pick, in the order the numbers run.
+   *
+   * The single source of truth for "what is a result". The badges are
+   * numbered from it and the number shortcuts read from it, so the digit on a
+   * row and the row that `Ctrl+N` opens are the same row by construction.
+   */
+  getSelectableRows(): Array<{ index: number; row: HTMLElement | undefined }>;
   getSelectedIndex(): number;
   /** Move the highlight only. Does not confirm the choice. */
   setSelectedIndex(index: number, source?: Event): void;

@@ -34,8 +34,8 @@ const en = {
   conflictName: "Several equally good matches",
   conflictDesc: "What to do when more than one result matches with the same strength.",
   conflictUnique: "Do nothing (recommended)",
-  conflictFirst: "Take the first result",
-  conflictLast: "Take the last result",
+  conflictFirst: "Take the strongest match",
+  conflictLast: "Take the weakest match",
   conflictNone: "Never act",
 
   headingQuickSelect: "Quick select",
@@ -76,7 +76,8 @@ const en = {
   ignoreCaseName: "Ignore letter case",
   ignoreCaseDesc: "",
   ignoreSeparatorsName: "Ignore spaces, hyphens and dots",
-  ignoreSeparatorsDesc: "`my-note` matches `my note`. Applies to normalized matches only.",
+  ignoreSeparatorsDesc:
+    "`my-note` matches `my note`. It also flattens every match to the normalized level, because the separators are gone before the comparison.",
 
   headingAdvanced: "Troubleshooting",
   debugName: "Debug logging",
@@ -120,8 +121,8 @@ const zh: Record<keyof typeof en, string> = {
   conflictName: "多个结果同样匹配",
   conflictDesc: "多个结果的匹配强度相同时如何处理。",
   conflictUnique: "不动作（推荐）",
-  conflictFirst: "取第一个结果",
-  conflictLast: "取最后一个结果",
+  conflictFirst: "取匹配最强的一个",
+  conflictLast: "取匹配最弱的一个",
   conflictNone: "从不自动动作",
 
   headingQuickSelect: "快捷键选择",
@@ -162,7 +163,8 @@ const zh: Record<keyof typeof en, string> = {
   ignoreCaseName: "忽略字母大小写",
   ignoreCaseDesc: "",
   ignoreSeparatorsName: "忽略空格、连字符和点",
-  ignoreSeparatorsDesc: "`my-note` 可以匹配 `my note`。仅作用于规范化匹配。",
+  ignoreSeparatorsDesc:
+    "`my-note` 可以匹配 `my note`。它同时把所有匹配都压平到规范化一档，因为分隔符在比较之前就被去掉了。",
 
   headingAdvanced: "排查",
   debugName: "调试日志",

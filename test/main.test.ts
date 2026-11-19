@@ -80,7 +80,11 @@ function makeHost(titles: string[], kind: "file" | "generic" = "file"): Host {
     values,
     selectedItem: 0,
     containerEl: container,
-    setSelectedItem: vi.fn(),
+    // The host keeps the selection; the fake has to as well, or a test
+    // cannot tell whether the highlight actually moved.
+    setSelectedItem: vi.fn((index: number) => {
+      list.selectedItem = index;
+    }),
     useSelectedItem: vi.fn(() => {
       committed.push(1);
       return true;
@@ -243,6 +247,32 @@ describe("plugin orchestration", () => {
     expect(internals.autoMatch.runNow(context!)).toBe(false);
   });
 
+  it("backs off while the user is choosing by hand", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+    const host = makeHost(["Alpha", "Beta"]);
+    host.modal.open();
+
+    const input = (host.modal as unknown as { inputEl: HTMLInputElement }).inputEl;
+    input.value = "Beta";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const context = internals.contexts.all()[0];
+    expect(internals.autoMatch.runNow(context!)).toBe(true);
+    expect(context?.getSelectedIndex()).toBe(1);
+
+    // The user presses an arrow key and moves the highlight themselves.
+    // The plugin must not fight them for the next moment: this is the
+    // behaviour that stops auto match from stealing the selection while
+    // someone is scrolling through the list.
+    context?.noteManualNavigation();
+    context?.setSelectedIndex(0);
+    expect(context?.getSelectedIndex()).toBe(0);
+
+    expect(internals.autoMatch.runNow(context!)).toBe(false);
+    expect(context?.getSelectedIndex()).toBe(0);
+  });
+
   it("follows the quick select toggle without touching the scene", async () => {
     const { plugin, internals } = await boot();
     active = plugin;
@@ -321,6 +351,87 @@ describe("plugin orchestration", () => {
 
     const context = internals.contexts.all()[0];
     expect(context?.getCandidates()).toHaveLength(0);
+  });
+
+  it("numbers the same rows the number keys pick", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+    const host = makeHost(["Alpha", "Beta"]);
+    host.modal.open();
+
+    // The badge on a row has to be the row that `Ctrl+N` opens. The two used
+    // to be filtered differently — the badges by DOM class, the candidates by
+    // the value's type — and could disagree on the same list.
+    const context = internals.contexts.all()[0];
+    const selectable = context?.getSelectableRows() ?? [];
+    const badges = Array.from(host.container.querySelectorAll(".snapto-index"));
+
+    expect(badges).toHaveLength(selectable.length);
+    for (let i = 0; i < selectable.length; i += 1) {
+      const row = selectable[i]?.row;
+      expect(row?.querySelector(".snapto-index")?.textContent).toBe(String(i + 1));
+    }
+
+    // And the candidate at the same position is the one the badge names.
+    const candidates = context?.getCandidates() ?? [];
+    for (let i = 0; i < candidates.length; i += 1) {
+      expect(candidates[i]?.index).toBe(selectable[i]?.index);
+    }
+  });
+
+  it("keeps the badge and the shortcut on the same row when a heading lies", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+    const host = makeHost(["Alpha", "Beta"]);
+
+    // A row the host marked as a heading, whose value does not say so.
+    // The badge renderer filtered on the class, the candidate list on the
+    // value's type, so the digit "1" sat on "Alpha" while `Ctrl+1` opened
+    // the heading.
+    const heading = host.container.createEl("div", {
+      cls: "suggestion-item mod-group",
+    });
+    heading.setText("Recent");
+    host.container.insertBefore(heading, host.container.firstChild);
+    host.values.unshift({ name: "Recent" });
+
+    host.modal.open();
+
+    const context = internals.contexts.all()[0];
+    const candidates = context?.getCandidates() ?? [];
+    const badges = Array.from(host.container.querySelectorAll(".snapto-index"));
+
+    // The heading is not a result, so it gets no number and is not a
+    // candidate. "Alpha" is both the first badge and the first candidate.
+    expect(candidates.map((candidate) => candidate.text)).toEqual(["Alpha", "Beta"]);
+    expect(badges).toHaveLength(2);
+    expect(badges[0]?.parentElement?.textContent).toContain("Alpha");
+    expect(candidates[0]?.text).toBe("Alpha");
+  });
+
+  it("numbers the row the first candidate points at", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+    const host = makeHost(["Alpha"]);
+
+    // A heading row whose value carries a type other than "group" — the
+    // search suggester pushes "property-key" entries next to "group"
+    // headings. Old code put the badge "1" on "Alpha" while the first
+    // candidate was the heading, so `Ctrl+1` opened something else.
+    const heading = host.container.createEl("div", { cls: "suggestion-item mod-group" });
+    heading.setText("Recent");
+    host.container.insertBefore(heading, host.container.firstChild);
+    host.values.unshift({ type: "property-key", name: "Recent" });
+
+    host.modal.open();
+
+    const context = internals.contexts.all()[0];
+    const candidates = context?.getCandidates() ?? [];
+    const badges = Array.from(host.container.querySelectorAll(".snapto-index"));
+
+    expect(candidates[0]?.text).toBe("Alpha");
+    expect(badges).toHaveLength(1);
+    expect(badges[0]?.parentElement?.textContent).toContain("Alpha");
   });
 
   it("skips a disabled surface stacked above an enabled one", async () => {

@@ -77,12 +77,56 @@ describe("SuggestionContext", () => {
     expect(candidates.map((candidate) => candidate.index)).toEqual([0, 2]);
   });
 
+  it("skips a row the host marks as a heading even when its value says otherwise", () => {
+    // The row carries `mod-group`, so it is a heading. A value that does not
+    // say "group" must not put it back into the result list — otherwise the
+    // badge on it and the row `Ctrl+1` opens drift apart.
+    const parts = buildList([{ title: "Recent", group: true }, { title: "Alpha" }]);
+    parts.list.values = [{ name: "Recent" }, { name: "Alpha" }];
+    const context = makeContext(parts);
+
+    const candidates = context.getCandidates();
+    expect(candidates.map((candidate) => candidate.text)).toEqual(["Alpha"]);
+  });
+
   it("still maps rows when the host adds extra decoration rows", () => {
     const parts = buildList([{ title: "Alpha" }, { title: "Beta" }]);
     parts.container.appendChild(createEl("div", { cls: "suggestion-empty", text: "extra" }));
     const context = makeContext(parts);
 
     expect(context.getCandidates().map((candidate) => candidate.text)).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("does not read a title off a decoration row when the counts drift", () => {
+    // A third party inserted a plain row that carries no value of its own.
+    // Pairing by position read "Alpha" from the decoration row's text, and
+    // the plugin would then act on the wrong note.
+    const parts = buildList([{ title: "Alpha" }, { title: "Beta" }]);
+    const decoration = createEl("div", { cls: "suggestion-item" });
+    decoration.setText("Decoration");
+    parts.container.insertBefore(decoration, parts.container.firstChild);
+    const context = makeContext(parts);
+
+    const candidates = context.getCandidates();
+    expect(candidates.map((candidate) => candidate.text)).toEqual(["Alpha", "Beta"]);
+    expect(candidates.map((candidate) => candidate.index)).toEqual([0, 1]);
+  });
+
+  it("leaves a value unpaired rather than giving it the wrong row", () => {
+    // The counts drift and the value's title appears nowhere among the rows.
+    // A guess would pick a row that shows something else; leaving it
+    // unpaired keeps the index right, and the text falls back to the value.
+    const parts = buildList([{ title: "Alpha" }]);
+    const decoration = createEl("div", { cls: "suggestion-item" });
+    decoration.setText("Decoration");
+    parts.container.insertBefore(decoration, parts.container.firstChild);
+    parts.list.values = [{ name: "FromValue" }];
+    const context = makeContext(parts);
+
+    const candidates = context.getCandidates();
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.index).toBe(0);
+    expect(candidates[0]?.text).toBe("FromValue");
   });
 
   it("falls back to the value when a row is missing", () => {

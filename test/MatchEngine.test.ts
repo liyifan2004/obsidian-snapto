@@ -119,6 +119,46 @@ describe("matchAll", () => {
     const hits = matchAll(["aaa", "aaa"], "aaa", options);
     expect(hits.map((hit) => hit.index)).toEqual([0, 1]);
   });
+
+  it("ranks a match that starts earlier above one that starts later", () => {
+    // Both are contains hits, so the difference is the position penalty.
+    // This test exists to pin the ranking down: a weight that changed
+    // silently would move the highlight to a different note, and nothing
+    // else in the suite would notice.
+    const hits = matchAll(["aaaNote", "bNote"], "Note", { ...options, minLevel: "contains" });
+
+    expect(hits.map((hit) => hit.text)).toEqual(["bNote", "aaaNote"]);
+    expect(resolveConflict(hits, "first")?.text).toBe("bNote");
+    expect(resolveConflict(hits, "last")?.text).toBe("aaaNote");
+  });
+
+  it("ranks a shorter title above a longer one at the same position", () => {
+    const hits = matchAll(["Note", "Note but much longer"], "Note", {
+      ...options,
+      minLevel: "contains",
+    });
+
+    expect(hits.map((hit) => hit.text)).toEqual(["Note", "Note but much longer"]);
+  });
+
+  it("lets a near miss beat a far one, and a long title lose to a short one", () => {
+    // "xNote" is one character away, "prefix Note long text" is far away but
+    // the title itself is short enough to stay competitive. Which of the two
+    // wins is decided by the position penalty against the length penalty.
+    //
+    // The score gap is asserted as well as the order, because the order
+    // alone survives a weight change: the two penalties would have to swap
+    // places for the ranking to flip, and the gap is what says how close it
+    // is.
+    const hits = matchAll(["prefix Note long text", "xNote"], "Note", {
+      ...options,
+      minLevel: "contains",
+    });
+
+    expect(hits.map((hit) => hit.text)).toEqual(["xNote", "prefix Note long text"]);
+    expect(hits[0]?.score).toBe(695);
+    expect(hits[1]?.score).toBe(662);
+  });
 });
 
 describe("resolveConflict", () => {
