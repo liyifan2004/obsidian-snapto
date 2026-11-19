@@ -166,16 +166,27 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   }
 
   /**
-   * Whether the number shortcuts are available on this surface.
+   * Whether the number keys are available on this surface.
    *
-   * The badge numbers and the number keys are one feature, so they answer the
-   * same question. They used to answer different ones — the shortcut toggle
-   * had no say over the badges — which meant turning "Enable number
-   * shortcuts" off left the digits on screen, pointing at keys that no
-   * longer did anything.
+   * The keys and the digits are one feature, so they answer the same
+   * question. They used to answer different ones — the shortcut toggle had
+   * no say over the badges — which meant turning "Enable number shortcuts"
+   * off left the digits on screen, pointing at keys that no longer did
+   * anything.
    */
   private shortcutsEnabled(context: SuggestionContext): boolean {
-    return this.settings.quickSelectEnabled && this.isSceneEnabled(context);
+    return this.settings.numberDisplay !== "off" && this.isSceneEnabled(context);
+  }
+
+  /**
+   * Whether the digits are drawn on this surface.
+   *
+   * Only when the keys work too. A digit is a promise that the number key
+   * opens that row, so a digit without a working key is a lie.
+   */
+  private badgesEnabled(context: SuggestionContext): boolean {
+    if (!this.shortcutsEnabled(context)) return false;
+    return this.settings.numberDisplay !== "keys-only";
   }
 
   private syncContext(context: SuggestionContext): void {
@@ -189,8 +200,8 @@ export default class SnapToPlugin extends Plugin implements SettingsHost {
   }
 
   private refreshBadges(context: SuggestionContext): void {
-    if (this.settings.showBadges && this.shortcutsEnabled(context)) {
-      this.badges.apply(context, this.settings.badgeStyle === "always");
+    if (this.badgesEnabled(context)) {
+      this.badges.apply(context, this.settings.numberDisplay === "always");
     } else {
       this.badges.clear(context);
     }

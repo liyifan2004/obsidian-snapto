@@ -56,6 +56,7 @@ Requires Obsidian 1.5.0 or newer, desktop only. The feature is a modifier plus a
 
 | Setting | Default | Notes |
 | --- | --- | --- |
+| Result numbers | digits while the modifier is held | Also switches the number keys on and off. The digits are only drawn when the keys work, so a digit always means something. |
 | Auto match | on | Watches the result list, not the input. |
 | When a match is found | highlight only | Confirm selection is limited to exact and normalized matches. |
 | Idle delay | 1000 ms | Range 200-5000 ms. |

@@ -148,16 +148,25 @@ export class SnapToSettingTab extends PluginSettingTab {
   private renderQuickSelect(containerEl: HTMLElement): void {
     new Setting(containerEl).setName(t("headingQuickSelect")).setHeading();
 
+    // One control for the whole feature. The digits and the keys are the
+    // same thing seen from two sides, and separate switches could promise a
+    // key that did nothing.
     new Setting(containerEl)
-      .setName(t("quickSelectName"))
-      .setDesc(t("quickSelectDesc"))
-      .addToggle((toggle) =>
-        toggle.setValue(this.host.settings.quickSelectEnabled).onChange((value) => {
-          this.commit((settings) => {
-            settings.quickSelectEnabled = value;
-          });
-          this.display();
-        }),
+      .setName(t("numberDisplayName"))
+      .setDesc(t("numberDisplayDesc"))
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("off", t("numberDisplayOff"))
+          .addOption("on-modifier", t("numberDisplayOnModifier"))
+          .addOption("always", t("numberDisplayAlways"))
+          .addOption("keys-only", t("numberDisplayKeysOnly"))
+          .setValue(this.host.settings.numberDisplay)
+          .onChange((value) => {
+            this.commit((settings) => {
+              settings.numberDisplay = value as SnapToSettings["numberDisplay"];
+            });
+            this.display();
+          }),
       );
 
     new Setting(containerEl)
@@ -173,34 +182,6 @@ export class SnapToSettingTab extends PluginSettingTab {
           .onChange((value) => {
             this.commit((settings) => {
               settings.modifier = value as ModifierKey;
-            });
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("badgeName"))
-      .setDesc(t("badgeDesc"))
-      .addToggle((toggle) =>
-        toggle.setValue(this.host.settings.showBadges).onChange((value) => {
-          this.commit((settings) => {
-            settings.showBadges = value;
-          });
-          this.display();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(t("badgeStyleName"))
-      .setDesc(t("badgeStyleDesc"))
-      .setDisabled(!this.host.settings.showBadges)
-      .addDropdown((dropdown) =>
-        dropdown
-          .addOption("on-modifier", t("badgeOnModifier"))
-          .addOption("always", t("badgeAlways"))
-          .setValue(this.host.settings.badgeStyle)
-          .onChange((value) => {
-            this.commit((settings) => {
-              settings.badgeStyle = value as SnapToSettings["badgeStyle"];
             });
           }),
       );

@@ -26,6 +26,18 @@ describe("normalize", () => {
     expect(normalize("my-note_2026", options)).toBe("mynote2026");
   });
 
+  it("drops exactly the separators the setting promises", () => {
+    // The setting description names the characters. This pins the list, so
+    // the wording cannot drift away from what the code strips.
+    expect(normalize("a_b-c.d·e f", options)).toBe("abcdef");
+    for (const separator of [" ", "-", "_", "·", "."]) {
+      expect(normalize(`a${separator}b`, options)).toBe("ab");
+    }
+    // And nothing else: a slash or a colon is part of the name.
+    expect(normalize("a/b", options)).toBe("a/b");
+    expect(normalize("a:b", options)).toBe("a:b");
+  });
+
   it("keeps separators when the option is off", () => {
     expect(normalize("my note", { ...options, ignoreSeparators: false })).toBe("my note");
     expect(normalize("  my note  ", { ...options, ignoreSeparators: false })).toBe("my note");
@@ -158,6 +170,39 @@ describe("matchAll", () => {
     expect(hits.map((hit) => hit.text)).toEqual(["xNote", "prefix Note long text"]);
     expect(hits[0]?.score).toBe(695);
     expect(hits[1]?.score).toBe(662);
+  });
+
+  it("prefers a match at the front of a long title over one in the middle", () => {
+    // The position penalty has to outvote the length penalty: a query at the
+    // start of a long title is the title itself with a suffix, while one in
+    // the middle is somewhere inside a phrase. If the weights were swapped,
+    // the second would win — and that would be backwards.
+    const hits = matchAll(["meeting notes for the team"], "meeting", {
+      ...options,
+      minLevel: "contains",
+    });
+
+    expect(hits[0]?.text).toBe("meeting notes for the team");
+
+    // The same query inside the title loses to one at the front.
+    const mixed = matchAll(["a very long note about meetings", "meeting"], "meeting", {
+      ...options,
+      minLevel: "contains",
+    });
+    expect(mixed[0]?.text).toBe("meeting");
+  });
+
+  it("keeps the ranking when the weights are retuned for a good reason", () => {
+    // A test that asserted the score would break on any retune. Asserting
+    // the outcome is what makes the weights meaningful: a retune that
+    // inverts the ranking fails here.
+    const hits = matchAll(["prefix Note long text", "xNote"], "Note", {
+      ...options,
+      minLevel: "contains",
+    });
+
+    expect(resolveConflict(hits, "first")?.text).toBe("xNote");
+    expect(resolveConflict(hits, "last")?.text).toBe("prefix Note long text");
   });
 });
 

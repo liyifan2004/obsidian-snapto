@@ -39,22 +39,19 @@ const en = {
   conflictNone: "Never act",
 
   headingQuickSelect: "Quick select",
-  quickSelectName: "Enable number shortcuts",
-  quickSelectDesc:
-    "Press the modifier plus 1-9 to pick a result. Only active while a search surface is open, so typing in a note is unaffected.",
+  numberDisplayName: "Result numbers",
+  numberDisplayDesc:
+    "Press the modifier plus 1-9 to pick a result, and show a small digit next to each of the first nine. The digits are only drawn when the keys work, so a digit always means something.",
+  numberDisplayOff: "Off",
+  numberDisplayOnModifier: "Digits while the modifier is held",
+  numberDisplayAlways: "Digits always",
+  numberDisplayKeysOnly: "Keys only, no digits",
   modifierName: "Modifier key",
   modifierDesc: "Cmd on macOS and Ctrl elsewhere by default. Alt is unreliable on Windows: some layouts remap it to a character.",
   modifierMod: "Mod (Cmd / Ctrl)",
   modifierCtrl: "Ctrl",
   modifierAlt: "Alt",
   modifierMeta: "Cmd / Meta",
-
-  badgeName: "Show result numbers",
-  badgeDesc: "A small digit next to the first nine results.",
-  badgeStyleName: "When to show numbers",
-  badgeStyleDesc: "Showing them only while the modifier is held keeps the list quiet.",
-  badgeOnModifier: "While the modifier is held",
-  badgeAlways: "Always",
 
   headingScenes: "Scenes",
   scenesDesc: "Turn individual search surfaces off. Every scene keeps working natively when disabled.",
@@ -75,9 +72,9 @@ const en = {
   normalizeWidthDesc: "A full-width colon, digit or bracket matches its half-width counterpart.",
   ignoreCaseName: "Ignore letter case",
   ignoreCaseDesc: "",
-  ignoreSeparatorsName: "Ignore spaces, hyphens and dots",
+  ignoreSeparatorsName: "Ignore spaces, hyphens, underscores, dots and ·",
   ignoreSeparatorsDesc:
-    "`my-note` matches `my note`. It also flattens every match to the normalized level, because the separators are gone before the comparison.",
+    "`my-note` matches `my note`. The separators are removed before the comparison, so every match level is affected: a title that differs only by separators counts as a normalized match.",
 
   headingAdvanced: "Troubleshooting",
   debugName: "Debug logging",
@@ -126,22 +123,19 @@ const zh: Record<keyof typeof en, string> = {
   conflictNone: "从不自动动作",
 
   headingQuickSelect: "快捷键选择",
-  quickSelectName: "启用数字快捷键",
-  quickSelectDesc:
-    "按修饰键加 1-9 选择对应结果。只在搜索界面打开时生效，正常编辑笔记不受影响。",
+  numberDisplayName: "结果序号",
+  numberDisplayDesc:
+    "按修饰键加 1-9 选择对应结果，并在前九个结果右侧显示小数字。只有数字键能用时才显示数字，所以看到的数字一定有意义。",
+  numberDisplayOff: "关闭",
+  numberDisplayOnModifier: "按住修饰键时显示",
+  numberDisplayAlways: "始终显示",
+  numberDisplayKeysOnly: "只要快捷键，不显示数字",
   modifierName: "修饰键",
   modifierDesc: "默认 macOS 用 Cmd，其他平台用 Ctrl。Windows 上 Alt 不可靠，部分键盘布局会把它变成字符。",
   modifierMod: "Mod（Cmd / Ctrl）",
   modifierCtrl: "Ctrl",
   modifierAlt: "Alt",
   modifierMeta: "Cmd / Meta",
-
-  badgeName: "显示结果序号",
-  badgeDesc: "在前九个结果右侧显示一个小数字。",
-  badgeStyleName: "序号显示时机",
-  badgeStyleDesc: "只在按住修饰键时显示，列表更干净。",
-  badgeOnModifier: "按住修饰键时",
-  badgeAlways: "始终显示",
 
   headingScenes: "场景",
   scenesDesc: "单独关闭某个搜索入口。关闭后该入口完全按原生方式工作。",
@@ -162,9 +156,9 @@ const zh: Record<keyof typeof en, string> = {
   normalizeWidthDesc: "全角冒号、数字、括号可以匹配对应的半角字符。",
   ignoreCaseName: "忽略字母大小写",
   ignoreCaseDesc: "",
-  ignoreSeparatorsName: "忽略空格、连字符和点",
+  ignoreSeparatorsName: "忽略空格、连字符、下划线、点和间隔号",
   ignoreSeparatorsDesc:
-    "`my-note` 可以匹配 `my note`。它同时把所有匹配都压平到规范化一档，因为分隔符在比较之前就被去掉了。",
+    "`my-note` 可以匹配 `my note`。分隔符在比较之前就被去掉，所以所有匹配等级都会受影响：只有分隔符差异的标题算规范化匹配。",
 
   headingAdvanced: "排查",
   debugName: "调试日志",

@@ -273,18 +273,18 @@ describe("plugin orchestration", () => {
     expect(context?.getSelectedIndex()).toBe(0);
   });
 
-  it("follows the quick select toggle without touching the scene", async () => {
+  it("follows the number display setting without touching the scene", async () => {
     const { plugin, internals } = await boot();
     active = plugin;
     const host = makeHost(["Alpha"]);
     host.modal.open();
     expect(internals.shortcuts.count()).toBe(1);
 
-    internals.settings.quickSelectEnabled = false;
+    internals.settings.numberDisplay = "off";
     internals.onSettingsChanged();
     expect(internals.shortcuts.count()).toBe(0);
 
-    internals.settings.quickSelectEnabled = true;
+    internals.settings.numberDisplay = "on-modifier";
     internals.onSettingsChanged();
     expect(internals.shortcuts.count()).toBe(1);
   });
@@ -298,13 +298,32 @@ describe("plugin orchestration", () => {
 
     // The digits and the number keys are one feature. Turning the keys off
     // must not leave digits pointing at keys that no longer work.
-    internals.settings.quickSelectEnabled = false;
+    internals.settings.numberDisplay = "off";
     internals.onSettingsChanged();
     expect(internals.shortcuts.count()).toBe(0);
     expect(badgeCount(host)).toBe(0);
 
-    internals.settings.quickSelectEnabled = true;
+    internals.settings.numberDisplay = "on-modifier";
     internals.onSettingsChanged();
+    expect(badgeCount(host)).toBe(2);
+  });
+
+  it("keeps the keys working without drawing any digits", async () => {
+    const { plugin, internals } = await boot();
+    active = plugin;
+    const host = makeHost(["Alpha", "Beta"]);
+    host.modal.open();
+
+    // "Keys only" is the one combination the old settings could not express:
+    // the keys work and no digit is drawn.
+    internals.settings.numberDisplay = "keys-only";
+    internals.onSettingsChanged();
+    expect(internals.shortcuts.count()).toBe(1);
+    expect(badgeCount(host)).toBe(0);
+
+    internals.settings.numberDisplay = "always";
+    internals.onSettingsChanged();
+    expect(internals.shortcuts.count()).toBe(1);
     expect(badgeCount(host)).toBe(2);
   });
 

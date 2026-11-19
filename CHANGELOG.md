@@ -45,10 +45,19 @@ it; every fix has a test that fails when the fix is reverted.
 
 ### Changed
 
+- **Three settings became one.** "Enable number shortcuts", "Show result
+  numbers" and "When to show numbers" are now a single "Result numbers"
+  setting with four values: off, digits while the modifier is held, digits
+  always, and keys only. The three old settings could disagree — the digits
+  could promise a key that did nothing, and one of them could end up doing
+  nothing at all — and the page did not say so. `keys only` is the
+  combination the old settings could not express. Settings written by an
+  older version are migrated on load.
 - The settings descriptions now say what the code does: `ignoreSeparators`
-  flattens every match to the normalized level rather than "applying to
-  normalized matches only", and the conflict policies take the strongest or
-  the weakest match rather than "the first" or "the last result".
+  removes spaces, hyphens, underscores, dots and `·` before the comparison,
+  which affects every match level, and the conflict policies take the
+  strongest or the weakest match rather than "the first" or "the last
+  result".
 - The README separates what is technically out of reach from what is not
   built yet, and describes the match strength as a floor rather than a
   ladder.
@@ -59,11 +68,16 @@ it; every fix has a test that fails when the fix is reverted.
 
 ### Tests
 
-- 132 → 164.
+- 132 → 172.
 - Three behaviours that users can feel had no test guarding them and now
   have one: the manual-navigation back-off, the weight that decides which of
   two equally-matching rows wins, and whether the number key is swallowed
   after a choice.
+- The match weights are now guarded by their *outcome* rather than by their
+  value, so a retune that flips the ranking fails a test while a retune that
+  keeps it does not.
+- The set of characters `ignoreSeparators` removes is pinned by a test, so
+  the setting's description cannot drift away from the code.
 
 ## [0.1.2] - 2026-11-13
 

@@ -95,12 +95,25 @@ The key event is handed to the host rather than replaced by a synthetic one. The
 
 `reconcile()` is the only writer of the three derived states — shortcuts, badges, watcher — and every path calls it: first attach, repeat open, settings change, external settings sync.
 
-The alternative was tried in 0.1.1 and failed. Turning a scene off disposed shortcuts, stopped the watcher and cleared badges; the next keystroke went through the reuse branch, which synced shortcuts using only `quickSelectEnabled`, so all three came back. Three branches each remembering part of the rule is what allowed that.
+The alternative was tried in 0.1.1 and failed. Turning a scene off disposed shortcuts, stopped the watcher and cleared badges; the next keystroke went through the reuse branch, which synced shortcuts using only the quick-select flag, so all three came back. Three branches each remembering part of the rule is what allowed that.
 
 Two consequences worth knowing:
 
 - **A disabled scene keeps its context.** Removing it would mean the surface cannot come back until it is reopened, and a modal does not reopen on its own. Instead `activeEnabledContext()` filters disabled scenes out of every consumer: commands, `match-now`, and the arrow-key tracker.
 - **`watch` is idempotent and is called even for disabled scenes.** `buildConfig` returns null for them, so the observer fires and does nothing. A watcher is never torn down on the settings path, because a torn-down watcher is exactly what could not come back.
+
+## The digits and the number keys answer one question
+
+The plugin has one setting for the whole feature, `numberDisplay`, with four
+values. Two predicates read it:
+
+- `shortcutsEnabled(context)` — are the number keys live on this surface?
+- `badgesEnabled(context)` — are the digits drawn?
+
+The digits are only drawn when the keys work. A digit on a row promises that
+the number key opens that row, and a promise without a key is a lie. The
+`keys-only` value is the one combination the old three settings could not
+express: the keys work and nothing is drawn.
 
 ## Multiple documents
 

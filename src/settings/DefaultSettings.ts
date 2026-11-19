@@ -9,12 +9,22 @@ export type AutoMatchAction = "highlight" | "confirm";
 /** How to react when several candidates match equally well. */
 export type ConflictPolicy = "unique" | "first" | "last" | "none";
 
+/**
+ * How the result numbers appear.
+ *
+ * One setting for both halves of the feature, because the halves cannot
+ * disagree: a digit on a row is a promise that the number key opens that row.
+ *
+ * - `off` — no numbers, no number keys.
+ * - `on-modifier` — numbers while the modifier is held, and the keys work
+ *   whenever they are pressed.
+ * - `always` — numbers always on screen; the keys work too.
+ * - `keys-only` — the keys work but no digit is ever drawn.
+ */
+export type NumberDisplay = "off" | "on-modifier" | "always" | "keys-only";
+
 export interface SceneSettings {
   enabled: boolean;
-}
-
-export interface BadgeSettings {
-  style: "on-modifier" | "always";
 }
 
 export interface SnapToSettings {
@@ -26,10 +36,8 @@ export interface SnapToSettings {
   ignoreCase: boolean;
   ignoreSeparators: boolean;
   conflictPolicy: ConflictPolicy;
-  quickSelectEnabled: boolean;
+  numberDisplay: NumberDisplay;
   modifier: ModifierKey;
-  showBadges: boolean;
-  badgeStyle: BadgeSettings["style"];
   scenes: Record<SceneId, SceneSettings>;
   debug: boolean;
 }
@@ -54,10 +62,8 @@ export const DEFAULT_SETTINGS: SnapToSettings = {
   ignoreCase: true,
   ignoreSeparators: true,
   conflictPolicy: "unique",
-  quickSelectEnabled: true,
+  numberDisplay: "on-modifier",
   modifier: "Mod",
-  showBadges: true,
-  badgeStyle: "on-modifier",
   scenes: {
     "quick-switcher": { enabled: true },
     "command-palette": { enabled: true },
@@ -72,7 +78,7 @@ const MODIFIERS: readonly ModifierKey[] = ["Mod", "Ctrl", "Alt", "Meta"];
 const ACTIONS: readonly AutoMatchAction[] = ["highlight", "confirm"];
 const POLICIES: readonly ConflictPolicy[] = ["unique", "first", "last", "none"];
 const LEVELS: readonly MatchLevel[] = ["exact", "normalized", "prefix", "contains", "fuzzy"];
-const BADGE_STYLES: readonly BadgeSettings["style"][] = ["on-modifier", "always"];
+const NUMBER_DISPLAYS: readonly NumberDisplay[] = ["off", "on-modifier", "always", "keys-only"];
 
 function pickEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
@@ -87,6 +93,31 @@ function pickBoolean(value: unknown, fallback: boolean): boolean {
 function pickDelay(value: unknown, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return Math.min(DELAY_MAX_MS, Math.max(DELAY_MIN_MS, Math.round(value)));
+}
+
+/**
+ * Read the number display mode, migrating the three old settings.
+ *
+ * The plugin used to have "enable number shortcuts", "show result numbers" and
+ * "when to show numbers" as separate controls. They could disagree — the
+ * numbers could promise a key that did nothing — so they are one setting
+ * now. A settings file written by an older version still has the old three,
+ * and this is where they become one.
+ */
+function pickNumberDisplay(source: Record<string, unknown>): NumberDisplay {
+  const direct = source.numberDisplay;
+  if (typeof direct === "string" && (NUMBER_DISPLAYS as readonly string[]).includes(direct)) {
+    return direct as NumberDisplay;
+  }
+
+  // No new value yet: read the old ones.
+  const keysEnabled = pickBoolean(source.quickSelectEnabled, true);
+  const badgesShown = pickBoolean(source.showBadges, true);
+  const oldStyle = source.badgeStyle === "always" ? "always" : "on-modifier";
+
+  if (!keysEnabled) return "off";
+  if (!badgesShown) return "keys-only";
+  return oldStyle;
 }
 
 /**
@@ -120,10 +151,8 @@ export function normalizeSettings(raw: unknown): SnapToSettings {
     ignoreCase: pickBoolean(source.ignoreCase, DEFAULT_SETTINGS.ignoreCase),
     ignoreSeparators: pickBoolean(source.ignoreSeparators, DEFAULT_SETTINGS.ignoreSeparators),
     conflictPolicy: pickEnum(source.conflictPolicy, POLICIES, DEFAULT_SETTINGS.conflictPolicy),
-    quickSelectEnabled: pickBoolean(source.quickSelectEnabled, DEFAULT_SETTINGS.quickSelectEnabled),
+    numberDisplay: pickNumberDisplay(source),
     modifier: pickEnum(source.modifier, MODIFIERS, DEFAULT_SETTINGS.modifier),
-    showBadges: pickBoolean(source.showBadges, DEFAULT_SETTINGS.showBadges),
-    badgeStyle: pickEnum(source.badgeStyle, BADGE_STYLES, DEFAULT_SETTINGS.badgeStyle),
     scenes,
     debug: pickBoolean(source.debug, DEFAULT_SETTINGS.debug),
   };

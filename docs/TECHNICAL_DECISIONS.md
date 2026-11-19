@@ -438,7 +438,7 @@ A scene is a property of the surface, not of its current contents. The surface w
 
 ## 0019. The badges and the number keys are one switch
 
-**Date:** 2026-11-19 · **Status:** accepted
+**Date:** 2026-11-19 · **Status:** superseded by 0022
 
 ### Context
 
@@ -458,6 +458,13 @@ The two settings stay separate otherwise — "Show result numbers" still decides
 
 - Turning off the number shortcuts also removes the digits.
 - `showBadges: false` still hides the digits while leaving the keys working, which is the combination the setting names describe.
+
+### Superseded
+
+The direction held — the digits and the keys answer one question — but keeping
+them as two switches left "Show result numbers" doing nothing whenever the
+keys were off, and left "always show the digits" unreachable in that state.
+Decision 0022 merges the three settings into one.
 
 ---
 
@@ -565,3 +572,130 @@ removes a whole class of wrong-file bugs.
 - A value whose title is not rendered keeps its index, and its text falls
   back to the value — the choice still lands on the right suggestion.
 - `BadgeRenderer` no longer inspects classes; it asks the context.
+
+---
+
+## 0022. The number keys and the digits are one setting
+
+**Date:** 2026-11-20 · **Status:** accepted
+
+### Context
+
+Three settings used to describe one feature:
+
+| Setting | UI name | What it actually controlled |
+| --- | --- | --- |
+| `quickSelectEnabled` | Enable number shortcuts | the keys **and** the digits |
+| `showBadges` | Show result numbers | the digits, but only if the keys were on |
+| `badgeStyle` | When to show numbers | always, or only while the modifier is held |
+
+The three could disagree, and the disagreement left the settings page lying.
+`showBadges` on and `quickSelectEnabled` off left the switch doing nothing —
+the digits were gone either way. `badgeStyle: "always"` was unreachable in
+that state, and nothing on the page said so. And `quickSelectEnabled` was
+named "Enable number shortcuts" while deciding the fate of the digits too.
+
+### Decision
+
+One setting, `numberDisplay`, with four values:
+
+| Value | Digits | Keys |
+| --- | --- | --- |
+| `off` | no | no |
+| `on-modifier` | while the modifier is held | yes |
+| `always` | always | yes |
+| `keys-only` | no | yes |
+
+`keys-only` is the combination the old settings could not express: the keys
+work and no digit is drawn.
+
+The digits are only drawn when the keys work. A digit on a row is a promise
+that the number key opens that row, and a promise without a key is a lie.
+
+### Rationale
+
+The alternatives were a single toggle with a separate style dropdown
+(what `obsidian-quick-select` does), or two independent switches. The
+independent version is the one that fails: it allows a digit to point at a
+key that does nothing.
+
+Research across comparable software found no project with two independent
+switches for this — the ones that do (`Tab Numbers 1-9`, `TabQ`) only work
+because the browser supplies the `Ctrl+1..9` itself and the extension merely
+draws the badge. Here the plugin provides both, so the two halves cannot be
+separated.
+
+The four values are chosen so that **every combination has a defined
+outcome**. That is the property the old settings lacked: there was no state
+in which "show the digits" and "always show them" could both be true and the
+result was still a lie.
+
+### Consequences
+
+- The old settings are migrated on load: `normalizeSettings` reads
+  `quickSelectEnabled`, `showBadges` and `badgeStyle` and writes the one
+  value they meant. A file written by an older version keeps working.
+- `data.json` no longer carries the three old keys after the next save.
+- The number of settings drops by two, and the page says what the digits
+  mean: they are drawn only when the key works.
+
+---
+
+## 0023. Why the weights are what they are
+
+**Date:** 2026-11-20 · **Status:** accepted
+
+### Context
+
+The contains level scores a hit as:
+
+```
+BASE_SCORE.contains - position * 4 - (text.length - query.length)
+```
+
+Two penalties: how far into the title the query starts, and how much extra
+text there is. Neither the `4` nor the `1` had a stated reason. The audit
+found that changing `4` to `400` left every test green — the numbers had no
+regression protection.
+
+The base scores have the same problem: `exact: 1000, normalized: 900,
+prefix: 800, contains: 700, fuzzy: 500`. They only need to order the levels
+against each other, and the spacing between them means nothing.
+
+### Decision
+
+Document what the numbers are for, and pin them with tests.
+
+`position * 4` — a character of position is worth four characters of extra
+text. The reasoning: a query that starts at the front of the title is
+usually the title itself with a suffix ("会议纪要 2026"), while a query that
+starts halfway in is usually somewhere in the middle of a longer phrase. The
+position penalty has to be able to outvote the length penalty, because
+position is the stronger signal; with a weight of one, a query at the start
+of a long title would lose to a query at the end of a short one, which is
+backwards.
+
+The extra-text penalty is `1` per character, because it is a tie-breaker
+within the same position class, not a primary signal.
+
+### Rationale
+
+The audit's real finding was not that `4` is wrong but that nobody could say
+what it was for. Two things follow from writing the reason down: the next
+person can tell whether the number still serves its purpose, and the tests
+can assert the *outcome* the number produces rather than the number itself.
+
+Asserting the outcome is the point. A test that says "the score is 695" will
+break when the constant is retuned for a good reason. A test that says "the
+shorter title wins" survives it, and still fails if the retuning inverts the
+ranking.
+
+### Consequences
+
+- The weights now have tests that fail when the ranking flips, not only when
+  a number changes. `position * 400` makes the ranking test red.
+- `unique` — the default policy — does not use the scores at all. Two hits
+  at the same level mean "do nothing", because two files with the same name
+  in different folders is the normal case in a vault. The scores decide only
+  under `first` and `last`, which are documented as taking the strongest and
+  the weakest match.

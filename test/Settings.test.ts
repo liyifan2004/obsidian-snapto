@@ -37,6 +37,48 @@ describe("normalizeSettings", () => {
     expect(settings.delayMs).toBe(DELAY_MIN_MS);
   });
 
+  it("keeps the number display mode the user chose", () => {
+    for (const mode of ["off", "on-modifier", "always", "keys-only"] as const) {
+      expect(normalizeSettings({ numberDisplay: mode }).numberDisplay).toBe(mode);
+    }
+  });
+
+  it("falls back to a valid mode for an unknown one", () => {
+    expect(normalizeSettings({ numberDisplay: "nonsense" }).numberDisplay).toBe("on-modifier");
+  });
+
+  it("migrates the three old number settings into one", () => {
+    // The old settings could disagree with each other. The digits were only
+    // drawn when the keys worked, so the pairs below are what the user
+    // actually saw.
+    expect(
+      normalizeSettings({ quickSelectEnabled: true, showBadges: true, badgeStyle: "always" })
+        .numberDisplay,
+    ).toBe("always");
+    expect(
+      normalizeSettings({ quickSelectEnabled: true, showBadges: true, badgeStyle: "on-modifier" })
+        .numberDisplay,
+    ).toBe("on-modifier");
+    expect(
+      normalizeSettings({ quickSelectEnabled: true, showBadges: false }).numberDisplay,
+    ).toBe("keys-only");
+    expect(
+      normalizeSettings({ quickSelectEnabled: false, showBadges: true }).numberDisplay,
+    ).toBe("off");
+    expect(
+      normalizeSettings({ quickSelectEnabled: false, showBadges: false }).numberDisplay,
+    ).toBe("off");
+  });
+
+  it("prefers the new setting over the old ones", () => {
+    const settings = normalizeSettings({
+      numberDisplay: "keys-only",
+      quickSelectEnabled: true,
+      showBadges: true,
+    });
+    expect(settings.numberDisplay).toBe("keys-only");
+  });
+
   it("clamps the delay into the allowed range", () => {
     expect(normalizeSettings({ delayMs: 99999 }).delayMs).toBe(DELAY_MAX_MS);
     expect(normalizeSettings({ delayMs: -5 }).delayMs).toBe(DELAY_MIN_MS);
